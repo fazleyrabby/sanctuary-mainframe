@@ -5,31 +5,45 @@ import type { GameState } from "../state/GameState";
 interface ResourceDef {
   key: ResourceKey;
   label: string;
+  category: "vital" | "mat" | "tech";
 }
 
 const RESOURCES: ResourceDef[] = [
-  { key: "food", label: "FOOD" },
-  { key: "water", label: "WATER" },
-  { key: "energy", label: "ENERGY" },
-  { key: "wood", label: "WOOD" },
-  { key: "stone", label: "STONE" },
-  { key: "scrap", label: "SCRAP" },
-  { key: "metal", label: "METAL" },
-  { key: "data", label: "DATA" },
-  { key: "compute", label: "COMPUTE" },
+  { key: "food", label: "FOOD", category: "vital" },
+  { key: "water", label: "WATER", category: "vital" },
+  { key: "energy", label: "PWR", category: "vital" },
+  { key: "wood", label: "WOOD", category: "mat" },
+  { key: "stone", label: "STONE", category: "mat" },
+  { key: "scrap", label: "SCRAP", category: "mat" },
+  { key: "metal", label: "METAL", category: "mat" },
+  { key: "data", label: "DATA", category: "tech" },
+  { key: "compute", label: "AI", category: "tech" },
 ];
 
-const TOOLS = ["Build", "Farm", "Research", "Explore", "AI"];
+const TOOLS = [
+  { id: "Build", label: "BUILD", key: "B" },
+  { id: "Farm", label: "FARM", key: "F" },
+  { id: "Research", label: "TECH", key: "T" },
+  { id: "Explore", label: "SCOUT", key: "E" },
+  { id: "AI", label: "MAINFRAME", key: "M" },
+];
 
 export class HUD {
+  private dayValue: HTMLElement;
   private clockValue: HTMLElement;
   private phaseValue: HTMLElement;
+  private clockDot: HTMLElement;
+
+  private popValue: HTMLElement;
+  private moraleValue: HTMLElement;
+  private healthValue: HTMLElement;
+
   private toolButtons: HTMLButtonElement[] = [];
   private resourceValues = new Map<ResourceKey, HTMLElement>();
   private resourceRates = new Map<ResourceKey, HTMLElement>();
   private resourceItems = new Map<ResourceKey, HTMLElement>();
+
   private warningBar: HTMLElement;
-  private colonyBar: HTMLElement;
   private toast: HTMLElement;
   private engineButton: HTMLButtonElement;
   private systemCallback: (action: string) => void = () => {};
@@ -38,114 +52,166 @@ export class HUD {
     const top = document.createElement("div");
     top.className = "hud-top";
 
+    // 1. Clock Module
     const clock = document.createElement("div");
-    clock.className = "hud-clock";
+    clock.className = "hud-module hud-clock-module";
+
+    this.clockDot = document.createElement("div");
+    this.clockDot.className = "status-dot day";
+
+    const clockMeta = document.createElement("div");
+    clockMeta.className = "clock-meta";
+
+    const row1 = document.createElement("div");
+    row1.className = "clock-row-top";
+    this.dayValue = document.createElement("span");
+    this.dayValue.className = "day-badge";
+    this.dayValue.textContent = "DAY 1";
     this.clockValue = document.createElement("span");
-    this.clockValue.className = "time";
-    this.clockValue.textContent = "--:--";
+    this.clockValue.className = "time-badge";
+    this.clockValue.textContent = "07:00";
+    row1.append(this.dayValue, this.clockValue);
+
     this.phaseValue = document.createElement("span");
-    this.phaseValue.className = "phase";
-    this.phaseValue.textContent = "morning";
-    clock.append(this.clockValue, this.phaseValue);
+    this.phaseValue.className = "phase-badge";
+    this.phaseValue.textContent = "MORNING";
 
+    clockMeta.append(row1, this.phaseValue);
+    clock.append(this.clockDot, clockMeta);
+
+    // 2. Resources Module
     const resources = document.createElement("div");
-    resources.className = "hud-resources";
-    for (const resource of RESOURCES) {
-      const item = document.createElement("div");
-      item.className = `resource ${resource.key}`;
+    resources.className = "hud-module hud-resources-module";
 
-      const icon = document.createElement("span");
-      icon.className = "icon";
+    let currentCat = "";
+    for (const resource of RESOURCES) {
+      if (currentCat !== "" && currentCat !== resource.category) {
+        const div = document.createElement("div");
+        div.className = "res-separator";
+        resources.append(div);
+      }
+      currentCat = resource.category;
+
+      const item = document.createElement("div");
+      item.className = `res-pill ${resource.key}`;
+
+      const dot = document.createElement("span");
+      dot.className = "res-dot";
 
       const label = document.createElement("span");
+      label.className = "res-label";
       label.textContent = resource.label;
 
-      const value = document.createElement("span");
-      value.className = "value";
-      value.textContent = "0";
+      const val = document.createElement("span");
+      val.className = "res-val";
+      val.textContent = "0";
 
       const rate = document.createElement("span");
-      rate.className = "rate";
+      rate.className = "res-rate";
 
-      item.append(icon, label, value, rate);
+      item.append(dot, label, val, rate);
       resources.append(item);
 
-      this.resourceValues.set(resource.key, value);
+      this.resourceValues.set(resource.key, val);
       this.resourceRates.set(resource.key, rate);
       this.resourceItems.set(resource.key, item);
     }
 
+    // 3. Colony Module
     const colony = document.createElement("div");
-    colony.className = "hud-colony";
-    this.colonyBar = document.createElement("div");
-    this.colonyBar.className = "colony-stat";
-    colony.append(this.colonyBar);
+    colony.className = "hud-module hud-colony-module";
 
+    const mkStat = (iconText: string, label: string) => {
+      const wrap = document.createElement("div");
+      wrap.className = "colony-stat-pill";
+      const lbl = document.createElement("span");
+      lbl.className = "colony-lbl";
+      lbl.textContent = `${iconText} ${label}`;
+      const val = document.createElement("span");
+      val.className = "colony-num";
+      val.textContent = "--";
+      wrap.append(lbl, val);
+      colony.append(wrap);
+      return val;
+    };
+
+    this.popValue = mkStat("👥", "POP");
+    this.moraleValue = mkStat("★", "MOR");
+    this.healthValue = mkStat("✚", "HP");
+
+    // 4. System Module
     const system = document.createElement("div");
-    system.className = "hud-system";
+    system.className = "hud-module hud-system-module";
 
     const engineBtn = document.createElement("button");
-    engineBtn.className = "sys-button engine-toggle";
-    engineBtn.textContent = "ENGINE: 3D (THREE.JS)";
-    engineBtn.title = "Click to toggle between Three.js (Orthographic 3D) and Pixi.js (2.5D Sprites)";
+    engineBtn.className = "sys-btn engine-toggle";
+    engineBtn.textContent = "2.5D (PIXI)";
+    engineBtn.title = "Toggle between Pixi.js (2.5D Sprites) and Three.js (Orthographic 3D)";
     engineBtn.addEventListener("click", () => this.systemCallback("toggle_engine"));
     this.engineButton = engineBtn;
     system.append(engineBtn);
 
     for (const label of ["Save", "Load", "New"]) {
-      const button = document.createElement("button");
-      button.className = "sys-button";
-      button.textContent = label;
-      button.addEventListener("click", () => this.systemCallback(label.toLowerCase()));
-      system.append(button);
+      const btn = document.createElement("button");
+      btn.className = "sys-btn";
+      btn.textContent = label;
+      btn.addEventListener("click", () => this.systemCallback(label.toLowerCase()));
+      system.append(btn);
     }
 
     top.append(clock, resources, colony, system);
 
+    // Controls hint
     const hint = document.createElement("div");
-    hint.className = "hud-hint";
+    hint.className = "hud-controls-hint";
     hint.innerHTML =
-      "<kbd>WASD</kbd> pan &nbsp; <kbd>drag</kbd> pan &nbsp; <kbd>wheel</kbd> zoom &nbsp; <kbd>Q/E</kbd> rotate<br>" +
-      "<kbd>B</kbd> build &nbsp; <kbd>click</kbd> gather/select &nbsp; <kbd>R</kbd> rotate &nbsp; <kbd>space</kbd> pause";
+      "<span class='hint-tag'>CONTROLS</span>" +
+      "<span class='hint-keys'><kbd>WASD</kbd> pan &nbsp; <kbd>wheel</kbd> zoom &nbsp; <kbd>B</kbd> build &nbsp; <kbd>click</kbd> action</span>";
 
     this.warningBar = document.createElement("div");
     this.warningBar.className = "hud-warnings";
+    this.warningBar.hidden = true;
 
     this.toast = document.createElement("div");
     this.toast.className = "hud-toast";
     this.toast.hidden = true;
 
+    // Bottom command dock
     const bottom = document.createElement("div");
-    bottom.className = "hud-bottom";
+    bottom.className = "hud-bottom-dock";
     for (const tool of TOOLS) {
-      const button = document.createElement("button");
-      button.className = "tool";
-      button.textContent = tool;
-      bottom.append(button);
-      this.toolButtons.push(button);
+      const btn = document.createElement("button");
+      btn.className = "dock-btn";
+      btn.innerHTML = `<span class="dock-key">${tool.key}</span><span class="dock-label">${tool.label}</span>`;
+      bottom.append(btn);
+      this.toolButtons.push(btn);
     }
 
     this.root.append(top, hint, this.warningBar, this.toast, bottom);
   }
 
   update(time: GameTime, state: GameState): void {
-    this.clockValue.textContent = `Day ${time.day}  ${time.clockLabel}`;
-    this.phaseValue.textContent = time.phase;
+    this.dayValue.textContent = `DAY ${time.day}`;
+    this.clockValue.textContent = time.clockLabel;
+    this.phaseValue.textContent = time.phase.toUpperCase();
+
+    // Status dot color matches time phase
+    this.clockDot.className = `status-dot ${time.phase.toLowerCase()}`;
 
     for (const resource of RESOURCES) {
       const value = state.resources[resource.key];
-      const valueElement = this.resourceValues.get(resource.key);
-      if (valueElement) valueElement.textContent = String(Math.floor(value));
+      const valElem = this.resourceValues.get(resource.key);
+      if (valElem) valElem.textContent = String(Math.floor(value));
 
       const rate = state.rates[resource.key];
-      const rateElement = this.resourceRates.get(resource.key);
-      if (rateElement) {
+      const rateElem = this.resourceRates.get(resource.key);
+      if (rateElem) {
         if (Math.abs(rate) < 0.05) {
-          rateElement.textContent = "";
+          rateElem.textContent = "";
         } else {
-          rateElement.textContent = `${rate > 0 ? "+" : ""}${rate.toFixed(1)}/h`;
-          rateElement.classList.toggle("positive", rate > 0);
-          rateElement.classList.toggle("negative", rate < 0);
+          rateElem.textContent = `${rate > 0 ? "+" : ""}${rate.toFixed(1)}`;
+          rateElem.classList.toggle("pos", rate > 0);
+          rateElem.classList.toggle("neg", rate < 0);
         }
       }
 
@@ -156,8 +222,9 @@ export class HUD {
       }
     }
 
-    this.colonyBar.textContent =
-      `POP ${state.population}   MORALE ${Math.round(state.morale)}   HEALTH ${Math.round(state.health)}`;
+    this.popValue.textContent = String(state.population);
+    this.moraleValue.textContent = `${Math.round(state.morale)}%`;
+    this.healthValue.textContent = `${Math.round(state.health)}%`;
 
     if (state.warnings.length === 0) {
       this.warningBar.hidden = true;
@@ -177,13 +244,15 @@ export class HUD {
   }
 
   setActiveTool(tool: string): void {
-    this.toolButtons.forEach((button) => {
-      button.classList.toggle("active", button.textContent === tool);
+    this.toolButtons.forEach((button, index) => {
+      button.classList.toggle("active", TOOLS[index]?.id === tool);
     });
   }
 
   setEngineMode(label: string): void {
-    this.engineButton.textContent = `ENGINE: ${label.toUpperCase()}`;
+    const isPixi = label.toLowerCase().includes("pixi");
+    this.engineButton.textContent = isPixi ? "2.5D (PIXI)" : "3D (THREE)";
+    this.engineButton.classList.toggle("pixi-active", isPixi);
   }
 
   onSystem(callback: (action: string) => void): void {
@@ -193,8 +262,9 @@ export class HUD {
   onTool(callback: (tool: string) => void): void {
     this.toolButtons.forEach((button, index) => {
       button.addEventListener("click", () => {
-        this.setActiveTool(TOOLS[index] as string);
-        callback(TOOLS[index] as string);
+        const tool = TOOLS[index]?.id ?? "Build";
+        this.setActiveTool(tool);
+        callback(tool);
       });
     });
   }

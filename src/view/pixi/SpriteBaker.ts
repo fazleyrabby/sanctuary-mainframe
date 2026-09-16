@@ -7,8 +7,8 @@ import {
   PCFSoftShadowMap,
   PlaneGeometry,
   Mesh,
-  MeshStandardMaterial,
   Scene,
+  ShadowMaterial,
   Vector3,
   WebGLRenderer,
 } from "three";
@@ -89,15 +89,10 @@ export class SpriteBaker {
       }
     });
 
-    // Shadow receiver ground plane (shadow only)
+    // Shadow receiver ground plane (receives shadow only, 100% transparent elsewhere)
     const shadowPlane = new Mesh(
-      new PlaneGeometry(12, 12),
-      new MeshStandardMaterial({
-        color: 0x000000,
-        roughness: 1,
-        transparent: true,
-        opacity: 0.28,
-      }),
+      new PlaneGeometry(16, 16),
+      new ShadowMaterial({ opacity: 0.38 }),
     );
     shadowPlane.rotation.x = -Math.PI / 2;
     shadowPlane.position.y = 0.001;
