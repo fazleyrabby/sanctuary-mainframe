@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sanctuary Mainframe — AoE vs Clash Direction</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0B0D0C;color:#D8DDD4;font-family:"Space Grotesk",system-ui,sans-serif;overflow-x:hidden}
+  .mono{font-family:"IBM Plex Mono",monospace}
+  .serif{font-family:"Instrument Serif",serif}
+  /* top bar */
+  .nav{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:14px 22px;background:rgba(11,13,12,.92);backdrop-filter:blur(10px);border-bottom:1px solid rgba(150,170,150,.12)}
+  .nav-left{font-size:10px;letter-spacing:.18em;opacity:.7}
+  .nav-right{display:flex;gap:8px}
+  .pill{padding:6px 12px;border-radius:999px;border:1px solid rgba(150,170,150,.18);font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.03)}
+  .pill.active{background:#7FD6C2;color:#0B0D0C;border-color:#7FD6C2;font-weight:700}
+
+  /* hero split */
+  .hero{display:grid;grid-template-columns:1fr 1fr;min-height:88vh}
+  .panel{position:relative;overflow:hidden;padding:28px 28px 26px;display:flex;flex-direction:column}
+  .panel:first-child{border-right:1px solid rgba(150,170,150,.12)}
+
+  /* labels */
+  .eyebrow{display:flex;align-items:center;gap:10px;font-size:10px;letter-spacing:.16em;text-transform:uppercase}
+  .dot{width:8px;height:8px;border-radius:50%}
+  .aoe-dot{background:#C9A86A;box-shadow:0 0 10px rgba(201,168,106,.6)}
+  .clash-dot{background:#8FCE7A;box-shadow:0 0 10px rgba(143,206,122,.6)}
+  .title{margin-top:14px;font-size:48px;line-height:.88;letter-spacing:-.03em}
+  .title em{font-family:"Instrument Serif",serif;font-weight:400;font-style:italic}
+  .subtitle{margin-top:12px;font-size:13px;line-height:1.5;opacity:.72;max-width:44ch}
+  .island{flex:1;display:grid;place-items:center;margin:18px -8px 10px;min-height:340px;position:relative}
+
+  /* badges */
+  .badge-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
+  .badge{font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:5px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04)}
+
+  /* spec grid */
+  .specs{display:grid;grid-template-columns:1fr 1fr;gap:22px;padding:22px;border-top:1px solid rgba(150,170,150,.12);background:rgba(255,255,255,.02)}
+  .spec h4{font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.6;margin-bottom:8px}
+  .spec ul{list-style:none;display:flex;flex-direction:column;gap:6px;font-size:12px;line-height:1.4;opacity:.88}
+  .spec li{display:flex;gap:8px}
+  .spec li::before{content:"—";opacity:.4}
+
+  /* AoE island art */
+  .aoe-scene{width:520px;height:360px;position:relative;filter:drop-shadow(0 22px 40px rgba(0,0,0,.45))}
+  .aoe-ground{position:absolute;inset:0;display:grid;place-items:center}
+  /* isometric diamond via CSS transform */
+  .iso{
+    width:420px;height:420px;
+    transform:rotate(45deg) scaleY(.58);
+    position:relative;
+    border-radius:18px;
+    overflow:hidden;
+  }
+  .aoe-iso{background:linear-gradient(180deg,#7B8A5A 0%, #6A7A52 35%, #8A7A54 100%)}
+  .clash-iso{background:#7BC950}
+  .iso-inner{position:absolute;inset:0;transform:rotate(-45deg) scaleY(1.72);display:grid;place-items:center}
+  /* fake tiles */
+  .tiles{position:absolute;inset:0;opacity:.18;background-image:linear-gradient(rgba(0,0,0,.35) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.35) 1px, transparent 1px);background-size:28px 28px}
+  .river{position:absolute;top:22%;left:-10%;right:30%;height:18%;background:linear-gradient(90deg,#2A5F6D,#3A7A88);opacity:.9;transform:skewX(-12deg);border-radius:999px;filter:blur(.2px)}
+  .clash-river{background:linear-gradient(90deg,#3AA0E0,#5AC0FF);height:14%;top:26%}
+
+  /* buildings - AoE style: muted, detailed, weathered */
+  .b{position:absolute;display:flex;flex-direction:column;align-items:center}
+  .aoe-b .roof{width:72px;height:42px;background:linear-gradient(180deg,#8B5A34 0%, #6E3E22 100%);clip-path:polygon(50% 0, 100% 28%, 100% 100%, 0 100%, 0 28%);border:1px solid rgba(0,0,0,.25);box-shadow:inset 0 1px 0 rgba(255,255,255,.18)}
+  .aoe-b .walls{width:68px;height:38px;background:linear-gradient(180deg,#C9B89A 0%, #A99A82 100%);border:1px solid rgba(0,0,0,.18);margin-top:-6px;position:relative}
+  .aoe-b .walls::after{content:"";position:absolute;inset:6px 8px auto 8px;height:14px;background:rgba(0,0,0,.08);border:1px solid rgba(0,0,0,.12)}
+  .aoe-b .base{width:74px;height:10px;background:#6B5E4A;margin-top:1px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .aoe-b.small .roof{width:52px;height:32px} .aoe-b.small .walls{width:48px;height:28px} .aoe-b.small .base{width:54px}
+
+  /* Clash buildings: chunky, saturated, outline, bevel */
+  .clash-b .roof{width:76px;height:44px;background:linear-gradient(180deg,#E67E22 0%, #D35400 100%);clip-path:polygon(50% 0, 100% 26%, 100% 100%, 0 100%, 0 26%);border:3px solid #1A1A1A;box-shadow:inset 0 2px 0 rgba(255,255,255,.35), inset 0 -2px 0 rgba(0,0,0,.2)}
+  .clash-b .walls{width:72px;height:40px;background:linear-gradient(180deg,#FFF4D6 0%, #FFE9A8 100%);border:3px solid #1A1A1A;border-top:none;margin-top:-4px;position:relative}
+  .clash-b .walls::after{content:"";position:absolute;top:8px;left:10px;right:10px;height:16px;background:#1A1A1A;border-radius:4px;box-shadow:0 2px 0 rgba(0,0,0,.2)}
+  .clash-b .base{width:78px;height:12px;background:#5A3A12;border:3px solid #1A1A1A;margin-top:1px;border-radius:4px}
+  .clash-b.small .roof{width:54px;height:34px} .clash-b.small .walls{width:50px;height:30px} .clash-b.small .base{width:56px}
+  .clash-b::after{content:"";position:absolute;inset:-2px;border:2px solid rgba(255,255,255,.0)} /* placeholder for glow */
+
+  /* placement helpers */
+  .p-a1{left:28%;top:18%} .p-a2{left:52%;top:12%} .p-a3{left:38%;top:42%} .p-a4{left:62%;top:36%} .p-a5{left:18%;top:52%}
+  .p-c1{left:30%;top:20%} .p-c2{left:54%;top:14%} .p-c3{left:40%;top:44%} .p-c4{left:64%;top:38%} .p-c5{left:20%;top:54%}
+
+  .shadow{position:absolute;width:90px;height:18px;background:rgba(0,0,0,.22);border-radius:50%;filter:blur(4px);bottom:-8px;left:50%;transform:translateX(-50%)}
+  .clash-b .shadow{background:rgba(0,0,0,.28);width:96px}
+
+  /* tree */
+  .tree{position:absolute;width:34px;height:50px;display:grid;place-items:center}
+  .tree .crown{width:36px;height:36px;background:radial-gradient(circle at 30% 30%, #A8D46F, #4A7A2A);border-radius:50%;border:2px solid rgba(0,0,0,.15)}
+  .clash-tree .crown{background:radial-gradient(circle at 30% 30%, #B8E986, #3A9E2E);border:3px solid #1A1A1A;box-shadow:inset 0 2px 0 rgba(255,255,255,.4)}
+  .tree .trunk{width:8px;height:14px;background:#5A3A16;margin-top:-6px;border-radius:2px}
+  .clash-tree .trunk{border:2px solid #1A1A1A;background:#8B5A12}
+
+  /* bottom callout */
+  .callouts{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:18px 22px;background:#0B0D0C;border-top:1px solid rgba(150,170,150,.12)}
+  .callout{padding:14px 16px;border-radius:10px;border:1px solid rgba(150,170,150,.12);background:rgba(255,255,255,.02)}
+  .callout h5{font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+  .callout p{font-size:12px;line-height:1.5;opacity:.78}
+  .callout.aoe h5{color:#C9A86A} .callout.clash h5{color:#8FCE7A}
+  .cta{margin:14px 22px;display:flex;gap:10px;align-items:center;justify-content:center;padding:14px;background:linear-gradient(90deg, rgba(201,168,106,.12), rgba(143,206,122,.12));border:1px solid rgba(150,170,150,.14);border-radius:10px;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+  .cta b{color:#7FD6C2}
+  @media(max-width:980px){.hero{grid-template-columns:1fr}.panel:first-child{border-right:none;border-bottom:1px solid rgba(150,170,150,.12)} .aoe-scene{width:92vw;max-width:520px}}
+</style>
+</head>
+<body>
+  <nav class="nav mono">
+    <div class="nav-left">SANCTUARY MAINFRAME — VISUAL DIRECTION STUDY / 2 OPTIONS</div>
+    <div class="nav-right">
+      <div class="pill">ORTHO 35.26° — THREE.JS</div>
+      <div class="pill active">48×48 GRID</div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <!-- AoE -->
+    <div class="panel" style="background:radial-gradient(520px 360px at 50% 38%, rgba(201,168,106,.18), transparent 70%), linear-gradient(180deg, #141512 0%, #0F0E0D 100%)">
+      <div class="eyebrow mono"><span class="dot aoe-dot"></span> Direction A — Age of Empires Grounded</div>
+      <div class="title serif">Weathered <em>&</em> Hand-Crafted<br><span style="color:#C9A86A">Stylized Realism</span></div>
+      <p class="subtitle">Muted ochre + desaturated greens, baked AO, trim-sheet detail, wear and soot. Every building reads by silhouette first. Palette fits PRD 44.6 post-apocalypse — fragile, improvised, hopeful.</p>
+      <div class="island">
+        <div class="aoe-scene">
+          <div class="iso aoe-iso">
+            <div class="tiles"></div>
+            <div class="river"></div>
+            <div class="iso-inner">
+              <!-- trees AoE -->
+              <div class="tree" style="left:16%;top:22%"><div class="crown"></div><div class="trunk"></div></div>
+              <div class="tree" style="left:72%;top:58%"><div class="crown" style="width:28px;height:28px"></div><div class="trunk"></div></div>
+              <div class="tree" style="left:78%;top:18%"><div class="crown" style="width:30px;height:30px"></div><div class="trunk"></div></div>
+              <!-- buildings AoE -->
+              <div class="b aoe-b p-a1"><div class="roof"></div><div class="walls"></div><div class="base"></div><div class="shadow"></div></div>
+              <div class="b aoe-b small p-a2"><div class="roof"></div><div class="walls"></div><div class="base"></div><div class="shadow"></div></div>
+              <div class="b aoe-b p-a3"><div class="roof" style="background:linear-gradient(180deg,#7A8A6E,#5A6A52)"></div><div class="walls"></div><div class="base"></div><div class="shadow"></div></div>
+              <div class="b aoe-b small p-a4"><div class="roof" style="background:linear-gradient(180deg,#8E7A5A,#6E5A3A)"></div><div class="walls"></div><div class="base"></div><div class="shadow"></div></div>
+              <div class="b aoe-b small p-a5"><div class="roof"></div><div class="walls"></div><div class="base"></div><div class="shadow"></div></div>
+            </div>
+          </div>
+          <div style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%)" class="mono"><span style="font-size:9px;letter-spacing:.14em;opacity:.5">TRUE ISOMETRIC • BOXGEOMETRY → GLTF KIT • PCFSOFT SHADOWS</span></div>
+        </div>
+      </div>
+      <div class="badge-row mono">
+        <span class="badge">PBR-lite • roughness 1.0</span><span class="badge">flatShading OFF</span><span class="badge">baked AO</span><span class="badge">trim sheet</span><span class="badge">splat terrain</span>
+      </div>
+    </div>
+
+    <!-- Clash -->
+    <div class="panel" style="background:radial-gradient(520px 360px at 50% 38%, rgba(143,206,122,.22), transparent 70%), linear-gradient(180deg, #0E1A12 0%, #0B120E 100%)">
+      <div class="eyebrow mono"><span class="dot clash-dot"></span> Direction B — Clash of Clans Chunky</div>
+      <div class="title serif">Toy <em>&</em> Readable<br><span style="color:#8FCE7A">Chibi Isometric</span></div>
+      <p class="subtitle">High-saturation grass + candy roofs, 1.4× chunky proportions, 3px outline, bevel + inner highlight. Maximum instant readability. Strongest at mobile thumbnail distance — but fights muted PRD tone.</p>
+      <div class="island">
+        <div class="aoe-scene">
+          <div class="iso clash-iso">
+            <div class="tiles" style="opacity:.1"></div>
+            <div class="river clash-river"></div>
+            <div class="iso-inner">
+              <div class="tree clash-tree" style="left:16%;top:22%"><div class="crown"></div><div class="trunk"></div></div>
+              <div class="tree clash-tree" style="left:72%;top:58%"><div class="crown" style="width:28px;height:28px"></div><div class="trunk"></div></div>
+              <div class="tree clash-tree" style="left:78%;top:18%"><div class="crown" style="width:30px;height:30px"></div><div class="trunk"></div></div>
+
+              <div class="b clash-b p-c1"><div class="roof"></div><div class="walls"></div><div class="base"></div><div class="shadow"></div></div>
+              <div class="b clash-b small p-c2"><div class="roof" style="background:linear-gradient(180deg,#F1C40F,#D4A015)"></div><div class="walls"></div><div class="base"></div><div class="shadow"></div></div>
+              <div class="b clash-b p-c3"><div class="roof" style="background:linear-gradient(180deg,#3498DB,#2176BD)"></div><div class="walls"></div><div class="base"></div><div class="shadow"></div></div>
+              <div class="b clash-b small p-c4"><div class="roof" style="background:linear-gradient(180deg,#E67E22,#C0392B)"></div><div class="walls"></div><div class="base"></div><div class="shadow"></div></div>
+              <div class="b clash-b small p-c5"><div class="roof"></div><div class="walls"></div><div class="base"></div><div class="shadow"></div></div>
+            </div>
+          </div>
+          <div style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%)" class="mono"><span style="font-size:9px;letter-spacing:.14em;opacity:.5">OUTLINE PASS • TOON RAMP • 3PX STROKE • CANDY PALETTE</span></div>
+        </div>
+      </div>
+      <div class="badge-row mono">
+        <span class="badge">toon ramp</span><span class="badge">outline pass</span><span class="badge">vertex colors</span><span class="badge">1.4× scale</span><span class="badge">bevel + highlight</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="specs mono">
+    <div class="spec">
+      <h4>What changes in your code</h4>
+      <ul>
+        <li>src/view/Materials.ts:39 turn off flatShading, add trim sheet (AoE) or ToonMaterial (Clash)</li>
+        <li>src/view/world/BuildingFactory.ts:88 replace BoxGeometry kits with GLTF + shared atlas</li>
+        <li>src/view/world/TerrainView.ts:144 instancing → splat shader + cliff trim</li>
+        <li>src/view/PostFX.ts:78 add OutlinePass only for Clash preset</li>
+      </ul>
+    </div>
+    <div class="spec">
+      <h4>What stays identical</h4>
+      <ul>
+        <li>CameraRig 45°/35.26° ortho, 48×48 grid, 1m tile — perfect for both</li>
+        <li>Simulation, save, AI, economy — untouched, purely visual swap</li>
+        <li>Performance: AoE = 1 draw call per atlas; Clash = +1 outline pass (~1ms at 1080p)</li>
+        <li>Quality presets low/med/high/ultra still valid, just new values</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="callouts">
+    <div class="callout aoe">
+      <h5 class="mono">AoE — Best fit for Sanctuary</h5>
+      <p>Respects PRD 44.1–44.6 muted base + warm ag / cool tech contrast. Ages believably, weathers to storytelling. Harder art lift (3–4 kits per building family) but future-proof for cinematic diorama.</p>
+    </div>
+    <div class="callout clash">
+      <h5 class="mono">Clash — Best for instant read</h5>
+      <p>Wins at 2-second thumbnail comprehension and mobile legibility. Risks generic “mobile game” feel and clashes with narrative gravity. Art lift is smaller — but narrative dissonance is larger.</p>
+    </div>
+  </section>
+
+  <div class="cta mono">Recommended hybrid — <b>AoE surface quality + Clash silhouette + Sanctuary palette</b> &nbsp; → Keep PRD desaturated world, add Clash-like 8% saturation boost + subtle outline (1px, not 3px) on gameplay buildings only.</div>
+  <div style="height:14px"></div>
+</body>
+</html>

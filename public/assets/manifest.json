@@ -1,0 +1,150 @@
+{
+  "buildings": [
+    {
+      "id": "shelter",
+      "file": "shelter.glb",
+      "dimensions": [
+        3.41,
+        3.0,
+        3.005
+      ]
+    },
+    {
+      "id": "storage",
+      "file": "storage.glb",
+      "dimensions": [
+        2.927,
+        2.94,
+        1.755
+      ]
+    },
+    {
+      "id": "farm",
+      "file": "farm.glb",
+      "dimensions": [
+        3.195,
+        3.05,
+        1.67
+      ]
+    },
+    {
+      "id": "water_collector",
+      "file": "water_collector.glb",
+      "dimensions": [
+        1.8,
+        2.33,
+        2.611
+      ]
+    },
+    {
+      "id": "workshop",
+      "file": "workshop.glb",
+      "dimensions": [
+        3.225,
+        2.685,
+        2.77
+      ]
+    },
+    {
+      "id": "generator",
+      "file": "generator.glb",
+      "dimensions": [
+        2.424,
+        1.9,
+        2.29
+      ]
+    },
+    {
+      "id": "server_room",
+      "file": "server_room.glb",
+      "dimensions": [
+        2.95,
+        2.9,
+        2.881
+      ]
+    },
+    {
+      "id": "ai_core",
+      "file": "ai_core.glb",
+      "dimensions": [
+        3.45,
+        3.0,
+        3.602
+      ]
+    }
+  ],
+  "props": [
+    {
+      "id": "dead_tree",
+      "file": "dead_tree.glb",
+      "dimensions": [
+        1.577,
+        1.409,
+        2.423
+      ]
+    },
+    {
+      "id": "pine_tree",
+      "file": "pine_tree.glb",
+      "dimensions": [
+        1.997,
+        2.1,
+        2.71
+      ]
+    },
+    {
+      "id": "rock",
+      "file": "rock.glb",
+      "dimensions": [
+        1.067,
+        0.743,
+        0.655
+      ]
+    },
+    {
+      "id": "boulder",
+      "file": "boulder.glb",
+      "dimensions": [
+        2.08,
+        1.56,
+        1.279
+      ]
+    },
+    {
+      "id": "bush",
+      "file": "bush.glb",
+      "dimensions": [
+        1.505,
+        0.834,
+        0.825
+      ]
+    },
+    {
+      "id": "crate",
+      "file": "crate.glb",
+      "dimensions": [
+        0.64,
+        0.61,
+        0.56
+      ]
+    },
+    {
+      "id": "barrel",
+      "file": "barrel.glb",
+      "dimensions": [
+        0.682,
+        0.682,
+        0.8
+      ]
+    },
+    {
+      "id": "scrap_pile",
+      "file": "scrap_pile.glb",
+      "dimensions": [
+        1.42,
+        1.177,
+        0.98
+      ]
+    }
+  ]
+}
