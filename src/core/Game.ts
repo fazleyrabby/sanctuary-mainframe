@@ -25,7 +25,7 @@ export class Game {
   private canvas: HTMLCanvasElement;
   private pixiCanvas: HTMLCanvasElement;
   private pixiView: PixiIsometricView | null = null;
-  private currentEngine: "three" | "pixi" = "three";
+  private currentEngine: "three" | "pixi" = "pixi";
 
   private state: GameState;
   private simulation = new SimulationSystem();
@@ -146,6 +146,9 @@ export class Game {
     this.view.updateCrops(this.state, this.world);
     this.cameraRig.focusOn(0, 0, true);
     this.hud.setActiveTool("Build");
+
+    // Boot directly into Pixi.js 2.5D engine on this experiment branch
+    await this.switchEngine("pixi");
   }
 
   start(): void {

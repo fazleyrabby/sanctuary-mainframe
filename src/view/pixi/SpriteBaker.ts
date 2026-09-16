@@ -122,9 +122,14 @@ export class SpriteBaker {
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
 
-    // Extract image data
-    const dataUrl = this.offCanvas.toDataURL("image/png");
-    const texture = Texture.from(dataUrl);
+    // Copy pixels to an independent canvas so PixiJS has a permanent, synchronous source
+    const spriteCanvas = document.createElement("canvas");
+    spriteCanvas.width = this.offCanvas.width;
+    spriteCanvas.height = this.offCanvas.height;
+    const ctx = spriteCanvas.getContext("2d");
+    if (ctx) ctx.drawImage(this.offCanvas, 0, 0);
+
+    const texture = Texture.from(spriteCanvas);
 
     // Clean up scene
     this.scene.remove(clone);
@@ -135,8 +140,8 @@ export class SpriteBaker {
       texture,
       anchorX: 0.5,
       anchorY: 0.72,
-      width: this.offCanvas.width,
-      height: this.offCanvas.height,
+      width: spriteCanvas.width,
+      height: spriteCanvas.height,
     };
   }
 
