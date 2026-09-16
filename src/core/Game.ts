@@ -8,6 +8,7 @@ import { Ghost } from "../view/Ghost";
 import { Picker } from "../view/Picker";
 import { Selection } from "../view/Selection";
 import { View } from "../view/View";
+import { PixiIsometricView } from "../view/pixi/PixiIsometricView";
 import { InputManager } from "../input/InputManager";
 import { BuildMenu } from "../ui/BuildMenu";
 import { HUD } from "../ui/HUD";
@@ -21,6 +22,11 @@ import { GameTime } from "./Time";
 export class Game {
   private world: World;
   private view: View;
+  private canvas: HTMLCanvasElement;
+  private pixiCanvas: HTMLCanvasElement;
+  private pixiView: PixiIsometricView | null = null;
+  private currentEngine: "three" | "pixi" = "three";
+
   private state: GameState;
   private simulation = new SimulationSystem();
   private saves = new SaveSystem();
@@ -42,7 +48,13 @@ export class Game {
   private selectedSeed: CropId = "wheat";
   private toast: { text: string; until: number } | null = null;
 
-  constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    pixiCanvas: HTMLCanvasElement,
+    uiRoot: HTMLElement,
+  ) {
+    this.canvas = canvas;
+    this.pixiCanvas = pixiCanvas;
     this.world = new World(
       GameConfig.world.gridWidth,
       GameConfig.world.gridHeight,
@@ -77,6 +89,7 @@ export class Game {
       if (action === "save") void this.saveGame();
       else if (action === "load") void this.loadGame();
       else if (action === "new") void this.newGame();
+      else if (action === "toggle_engine") void this.toggleEngine();
     });
 
     this.loop = new Loop(
@@ -87,6 +100,37 @@ export class Game {
 
     window.addEventListener("resize", this.onResize);
     this.onResize();
+  }
+
+  async toggleEngine(): Promise<void> {
+    if (this.currentEngine === "three") {
+      await this.switchEngine("pixi");
+    } else {
+      await this.switchEngine("three");
+    }
+  }
+
+  async switchEngine(engine: "three" | "pixi"): Promise<void> {
+    this.currentEngine = engine;
+    if (engine === "pixi") {
+      this.canvas.style.display = "none";
+      this.pixiCanvas.style.display = "block";
+      if (!this.pixiView) {
+        this.pixiView = new PixiIsometricView();
+        await this.pixiView.init(this.pixiCanvas);
+        this.pixiView.bakeAssets(this.view.assets);
+      }
+      this.pixiView.buildWorld(this.world, this.state);
+      this.hud.setEngineMode("2.5D (Pixi.js)");
+      this.toast = { text: "Active: Pixi.js 2.5D Sprite Engine", until: performance.now() + 2500 };
+      this.hud.setToast(this.toast.text);
+    } else {
+      this.pixiCanvas.style.display = "none";
+      this.canvas.style.display = "block";
+      this.hud.setEngineMode("3D (Three.js)");
+      this.toast = { text: "Active: Three.js Orthographic 3D Engine", until: performance.now() + 2500 };
+      this.hud.setToast(this.toast.text);
+    }
   }
 
   private get cameraRig() {
@@ -123,13 +167,17 @@ export class Game {
   }
 
   private render(delta: number): void {
-    this.handleCameraInput(delta);
-    this.handleKeyEdges();
-    this.updateHover();
-    this.handleClicks();
+    if (this.currentEngine === "pixi" && this.pixiView) {
+      this.pixiView.update(this.time);
+    } else {
+      this.handleCameraInput(delta);
+      this.handleKeyEdges();
+      this.updateHover();
+      this.handleClicks();
 
-    this.view.updateCrops(this.state, this.world);
-    this.view.render(delta, this.time);
+      this.view.updateCrops(this.state, this.world);
+      this.view.render(delta, this.time);
+    }
 
     this.hud.update(this.time, this.state);
     this.buildMenu.setAffordable((id) => this.state.canAfford(BUILDINGS[id].cost));

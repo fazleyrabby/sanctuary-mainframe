@@ -31,6 +31,7 @@ export class HUD {
   private warningBar: HTMLElement;
   private colonyBar: HTMLElement;
   private toast: HTMLElement;
+  private engineButton: HTMLButtonElement;
   private systemCallback: (action: string) => void = () => {};
 
   constructor(private readonly root: HTMLElement) {
@@ -82,6 +83,15 @@ export class HUD {
 
     const system = document.createElement("div");
     system.className = "hud-system";
+
+    const engineBtn = document.createElement("button");
+    engineBtn.className = "sys-button engine-toggle";
+    engineBtn.textContent = "ENGINE: 3D (THREE.JS)";
+    engineBtn.title = "Click to toggle between Three.js (Orthographic 3D) and Pixi.js (2.5D Sprites)";
+    engineBtn.addEventListener("click", () => this.systemCallback("toggle_engine"));
+    this.engineButton = engineBtn;
+    system.append(engineBtn);
+
     for (const label of ["Save", "Load", "New"]) {
       const button = document.createElement("button");
       button.className = "sys-button";
@@ -170,6 +180,10 @@ export class HUD {
     this.toolButtons.forEach((button) => {
       button.classList.toggle("active", button.textContent === tool);
     });
+  }
+
+  setEngineMode(label: string): void {
+    this.engineButton.textContent = `ENGINE: ${label.toUpperCase()}`;
   }
 
   onSystem(callback: (action: string) => void): void {

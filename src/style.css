@@ -280,6 +280,19 @@ body {
   border-color: rgba(127, 214, 194, 0.5);
 }
 
+.sys-button.engine-toggle {
+  background: rgba(127, 214, 194, 0.12);
+  border-color: rgba(127, 214, 194, 0.45);
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.sys-button.engine-toggle:hover {
+  background: rgba(127, 214, 194, 0.22);
+  border-color: var(--accent);
+}
+
 .hud-warnings {
   position: absolute;
   top: 96px;
