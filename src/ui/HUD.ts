@@ -10,12 +10,12 @@ interface ResourceDef {
 
 const RESOURCES: ResourceDef[] = [
   { key: "food", label: "FOOD", category: "vital" },
-  { key: "water", label: "WATER", category: "vital" },
+  { key: "water", label: "H₂O", category: "vital" },
   { key: "energy", label: "PWR", category: "vital" },
   { key: "wood", label: "WOOD", category: "mat" },
   { key: "stone", label: "STONE", category: "mat" },
   { key: "scrap", label: "SCRAP", category: "mat" },
-  { key: "metal", label: "METAL", category: "mat" },
+  { key: "metal", label: "MTL", category: "mat" },
   { key: "data", label: "DATA", category: "tech" },
   { key: "compute", label: "AI", category: "tech" },
 ];
@@ -50,11 +50,11 @@ export class HUD {
 
   constructor(private readonly root: HTMLElement) {
     const top = document.createElement("div");
-    top.className = "hud-top";
+    top.className = "hud-top-bar";
 
-    // 1. Clock Module
+    // 1. Clock Section
     const clock = document.createElement("div");
-    clock.className = "hud-module hud-clock-module";
+    clock.className = "hud-sect hud-sect-clock";
 
     this.clockDot = document.createElement("div");
     this.clockDot.className = "status-dot day";
@@ -79,9 +79,13 @@ export class HUD {
     clockMeta.append(row1, this.phaseValue);
     clock.append(this.clockDot, clockMeta);
 
-    // 2. Resources Module
+    // Divider
+    const div1 = document.createElement("div");
+    div1.className = "hud-vdiv";
+
+    // 2. Resources Section
     const resources = document.createElement("div");
-    resources.className = "hud-module hud-resources-module";
+    resources.className = "hud-sect hud-sect-resources";
 
     let currentCat = "";
     for (const resource of RESOURCES) {
@@ -117,9 +121,13 @@ export class HUD {
       this.resourceItems.set(resource.key, item);
     }
 
-    // 3. Colony Module
+    // Divider
+    const div2 = document.createElement("div");
+    div2.className = "hud-vdiv";
+
+    // 3. Colony Section
     const colony = document.createElement("div");
-    colony.className = "hud-module hud-colony-module";
+    colony.className = "hud-sect hud-sect-colony";
 
     const mkStat = (iconText: string, label: string) => {
       const wrap = document.createElement("div");
@@ -139,9 +147,13 @@ export class HUD {
     this.moraleValue = mkStat("★", "MOR");
     this.healthValue = mkStat("✚", "HP");
 
-    // 4. System Module
+    // Divider
+    const div3 = document.createElement("div");
+    div3.className = "hud-vdiv";
+
+    // 4. System Section
     const system = document.createElement("div");
-    system.className = "hud-module hud-system-module";
+    system.className = "hud-sect hud-sect-system";
 
     const engineBtn = document.createElement("button");
     engineBtn.className = "sys-btn engine-toggle";
@@ -159,7 +171,7 @@ export class HUD {
       system.append(btn);
     }
 
-    top.append(clock, resources, colony, system);
+    top.append(clock, div1, resources, div2, colony, div3, system);
 
     // Controls hint
     const hint = document.createElement("div");
