@@ -20,11 +20,19 @@ const RESOURCES: ResourceDef[] = [
   { key: "compute", label: "AI", category: "tech" },
 ];
 
-const TOOLS = [
+interface ToolDef {
+  id: string;
+  label: string;
+  key: string;
+  disabled?: boolean;
+  hint?: string;
+}
+
+const TOOLS: ToolDef[] = [
   { id: "Build", label: "BUILD", key: "B" },
   { id: "Farm", label: "FARM", key: "F" },
-  { id: "Research", label: "TECH", key: "T" },
-  { id: "Explore", label: "SCOUT", key: "E" },
+  { id: "Research", label: "TECH", key: "T", disabled: true, hint: "Research systems still offline" },
+  { id: "Explore", label: "SCOUT", key: "E", disabled: true, hint: "Scouting parties still organizing" },
   { id: "AI", label: "MAINFRAME", key: "M" },
 ];
 
@@ -45,7 +53,6 @@ export class HUD {
 
   private warningBar: HTMLElement;
   private toast: HTMLElement;
-  private engineButton: HTMLButtonElement;
   private systemCallback: (action: string) => void = () => {};
 
   constructor(private readonly root: HTMLElement) {
@@ -155,14 +162,6 @@ export class HUD {
     const system = document.createElement("div");
     system.className = "hud-sect hud-sect-system";
 
-    const engineBtn = document.createElement("button");
-    engineBtn.className = "sys-btn engine-toggle";
-    engineBtn.textContent = "2.5D (PIXI)";
-    engineBtn.title = "Toggle between Pixi.js (2.5D Sprites) and Three.js (Orthographic 3D)";
-    engineBtn.addEventListener("click", () => this.systemCallback("toggle_engine"));
-    this.engineButton = engineBtn;
-    system.append(engineBtn);
-
     for (const label of ["Save", "Load", "New"]) {
       const btn = document.createElement("button");
       btn.className = "sys-btn";
@@ -172,13 +171,6 @@ export class HUD {
     }
 
     top.append(clock, div1, resources, div2, colony, div3, system);
-
-    // Controls hint
-    const hint = document.createElement("div");
-    hint.className = "hud-controls-hint";
-    hint.innerHTML =
-      "<span class='hint-tag'>CONTROLS</span>" +
-      "<span class='hint-keys'><kbd>WASD</kbd> pan &nbsp; <kbd>wheel</kbd> zoom &nbsp; <kbd>B</kbd> build &nbsp; <kbd>click</kbd> action</span>";
 
     this.warningBar = document.createElement("div");
     this.warningBar.className = "hud-warnings";
@@ -195,11 +187,15 @@ export class HUD {
       const btn = document.createElement("button");
       btn.className = "dock-btn";
       btn.innerHTML = `<span class="dock-key">${tool.key}</span><span class="dock-label">${tool.label}</span>`;
+      if (tool.disabled) {
+        btn.classList.add("disabled");
+        btn.title = tool.hint ?? "Not yet available";
+      }
       bottom.append(btn);
       this.toolButtons.push(btn);
     }
 
-    this.root.append(top, hint, this.warningBar, this.toast, bottom);
+    this.root.append(top, this.warningBar, this.toast, bottom);
   }
 
   update(time: GameTime, state: GameState): void {
@@ -234,7 +230,7 @@ export class HUD {
       }
     }
 
-    this.popValue.textContent = String(state.population);
+    this.popValue.textContent = `${state.population}/${state.housing}`;
     this.moraleValue.textContent = `${Math.round(state.morale)}%`;
     this.healthValue.textContent = `${Math.round(state.health)}%`;
 
@@ -261,18 +257,13 @@ export class HUD {
     });
   }
 
-  setEngineMode(label: string): void {
-    const isPixi = label.toLowerCase().includes("pixi");
-    this.engineButton.textContent = isPixi ? "2.5D (PIXI)" : "3D (THREE)";
-    this.engineButton.classList.toggle("pixi-active", isPixi);
-  }
-
   onSystem(callback: (action: string) => void): void {
     this.systemCallback = callback;
   }
 
   onTool(callback: (tool: string) => void): void {
     this.toolButtons.forEach((button, index) => {
+      if (TOOLS[index]?.disabled) return;
       button.addEventListener("click", () => {
         const tool = TOOLS[index]?.id ?? "Build";
         this.setActiveTool(tool);

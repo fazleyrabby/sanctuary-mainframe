@@ -32,19 +32,20 @@ function applyPixelArtProcessing(ctx: CanvasRenderingContext2D, width: number, h
   const data = imgData.data;
   const isOpaque = new Uint8Array(width * height);
 
-  // 1. Mark opaque pixels & quantize colors into distinct cel-shaded tiers
+  // 1. Mark opaque pixels & quantize colors into soft cel-shaded tiers
+  // (kept subtle so hand-authored GLB detail survives the bake)
   for (let i = 0; i < width * height; i++) {
     const idx = i * 4;
     const a = data[idx + 3];
     if (a > 35) {
       isOpaque[i] = 1;
-      // Cel-shade / color quantization (steps of 32 for classic 16/32-bit palette look)
-      const step = 28;
+      // Gentle quantization (steps of 16) — rich gradients, not flat posterize
+      const step = 16;
       data[idx] = Math.min(255, Math.round(data[idx] / step) * step);
       data[idx + 1] = Math.min(255, Math.round(data[idx + 1] / step) * step);
       data[idx + 2] = Math.min(255, Math.round(data[idx + 2] / step) * step);
-      // Boost slight saturation & warmth for rich fantasy/colony aesthetic
-      data[idx] = Math.min(255, Math.round(data[idx] * 1.05));
+      // Subtle warmth for colony aesthetic
+      data[idx] = Math.min(255, Math.round(data[idx] * 1.03));
     }
   }
 
@@ -63,7 +64,7 @@ function applyPixelArtProcessing(ctx: CanvasRenderingContext2D, width: number, h
           data[idx] = 26;
           data[idx + 1] = 20;
           data[idx + 2] = 16;
-          data[idx + 3] = 220; // 1px dark silhouette outline
+          data[idx + 3] = 170; // softer 1px silhouette outline
         }
       }
     }
@@ -81,8 +82,8 @@ export class SpriteBaker {
 
   constructor() {
     this.offCanvas = document.createElement("canvas");
-    this.offCanvas.width = 96;
-    this.offCanvas.height = 96;
+    this.offCanvas.width = 192;
+    this.offCanvas.height = 192;
 
     this.renderer = new WebGLRenderer({
       canvas: this.offCanvas,
@@ -145,8 +146,8 @@ export class SpriteBaker {
     this.scene.add(shadowPlane);
     this.scene.add(clone);
 
-    // Dynamic resolution based on entity type: buildings 96x96, props 64x64
-    const res = isBuilding ? 96 : 64;
+    // High-res bake: buildings 192px, props 128px — stays crisp at 2-3 tile footprints
+    const res = isBuilding ? 192 : 128;
     this.offCanvas.width = res;
     this.offCanvas.height = res;
     this.renderer.setSize(res, res, false);

@@ -45,6 +45,9 @@ export interface SerializedState {
   population: number;
   morale: number;
   health: number;
+  fallen: boolean;
+  aiTrust: number;
+  advisorSnooze: { id: string; untilHour: number } | null;
   nextUid: number;
   occupancy: Array<[string, number]>;
 }
@@ -89,6 +92,14 @@ export class GameState {
   morale = 72;
   health = 100;
   warnings: string[] = [];
+  /** One-shot event messages for the HUD (deaths, milestones). Drained by Game. */
+  notices: string[] = [];
+  /** True once every colonist is gone. Sandbox continues; warnings say to start over. */
+  fallen = false;
+  /** 0–100. Rises when the Mainframe's advice is accepted, falls on dismissals and deaths. */
+  aiTrust = 50;
+  /** Dismissed advice stays quiet for a few game-hours. */
+  advisorSnooze: { id: string; untilHour: number } | null = null;
 
   private occupancy = new Map<string, number>();
   private nextUid = 1;
@@ -98,6 +109,15 @@ export class GameState {
   get capacity(): number {
     const stores = this.buildings.filter((b) => b.id === "storage").length;
     return BASE_CAPACITY + stores * CAPACITY_PER_STORAGE;
+  }
+
+  /** Total shelter beds across all housing buildings. */
+  get housing(): number {
+    let beds = 0;
+    for (const b of this.buildings) {
+      beds += BUILDINGS[b.id].housing ?? 0;
+    }
+    return beds;
   }
 
   canAfford(cost: ResourceCost): boolean {
@@ -238,6 +258,9 @@ export class GameState {
       population: this.population,
       morale: this.morale,
       health: this.health,
+      fallen: this.fallen,
+      aiTrust: this.aiTrust,
+      advisorSnooze: this.advisorSnooze ? { ...this.advisorSnooze } : null,
       nextUid: this.nextUid,
       occupancy: [...this.occupancy.entries()],
     };
@@ -250,11 +273,15 @@ export class GameState {
     this.population = data.population;
     this.morale = data.morale;
     this.health = data.health;
+    this.fallen = data.fallen ?? false;
+    this.aiTrust = data.aiTrust ?? 50;
+    this.advisorSnooze = data.advisorSnooze ? { ...data.advisorSnooze } : null;
     this.nextUid = data.nextUid;
     this.occupancy = new Map(data.occupancy);
     this.rates = zeroed();
     this.selected = null;
     this.warnings = [];
+    this.notices = [];
   }
 
   populateNodes(): void {

@@ -4,15 +4,18 @@ import { NODES } from "../data/resources";
 import { GameState, type PlacedBuilding, type ResourceNode } from "../state/GameState";
 import { SaveSystem, buildSaveData, type SaveData } from "../state/SaveSystem";
 import { SimulationSystem } from "../systems/SimulationSystem";
-import { Ghost } from "../view/Ghost";
-import { Picker } from "../view/Picker";
-import { Selection } from "../view/Selection";
+import {
+  evaluateMainframe,
+  snoozeDuration,
+  type MainframeReport,
+} from "../systems/MainframeAdvisor";
 import { View } from "../view/View";
 import { PixiIsometricView } from "../view/pixi/PixiIsometricView";
 import { InputManager } from "../input/InputManager";
 import { BuildMenu } from "../ui/BuildMenu";
 import { HUD } from "../ui/HUD";
 import { InspectorPanel, type InspectorContent, type InspectorRow } from "../ui/InspectorPanel";
+import { MainframePanel } from "../ui/MainframePanel";
 import { World, terrainName } from "../world/World";
 import { EventBus } from "./Events";
 import { GameConfig } from "./GameConfig";
@@ -25,7 +28,6 @@ export class Game {
   private canvas: HTMLCanvasElement;
   private pixiCanvas: HTMLCanvasElement;
   private pixiView: PixiIsometricView | null = null;
-  private currentEngine: "three" | "pixi" = "pixi";
 
   private state: GameState;
   private simulation = new SimulationSystem();
@@ -35,12 +37,9 @@ export class Game {
   private hud: HUD;
   private buildMenu: BuildMenu;
   private inspector: InspectorPanel;
+  private mainframe: MainframePanel;
   private loop: Loop;
   private events = new EventBus();
-
-  private picker: Picker;
-  private selection: Selection;
-  private ghost: Ghost;
 
   private buildId: BuildingId | null = null;
   private rotation = 0;
@@ -64,24 +63,19 @@ export class Game {
     this.state = new GameState(this.world);
 
     this.view = new View(canvas);
-    this.picker = new Picker(this.view.cameraRig.camera, this.world);
-    this.selection = new Selection(this.view.scene, this.view.materials, this.world);
-    this.ghost = new Ghost(
-      this.view.scene,
-      this.world,
-      this.view.materials,
-      this.view.buildingFactoryRef,
-    );
 
-    this.input = new InputManager(canvas);
+    this.input = new InputManager(pixiCanvas);
     this.hud = new HUD(uiRoot);
     this.buildMenu = new BuildMenu(uiRoot);
     this.inspector = new InspectorPanel(uiRoot, (id, payload) => this.onInspectorAction(id, payload));
+    this.mainframe = new MainframePanel(uiRoot, (id) => this.onMainframeAction(id));
 
     this.hud.onTool((tool) => {
       if (tool === "Build") {
         const visible = this.buildMenu.toggle();
         if (!visible) this.cancelBuild();
+      } else if (tool === "AI") {
+        this.mainframe.toggle(this.mainframeReport(), this.state.aiTrust);
       }
     });
     this.buildMenu.onSelect((id) => this.beginBuild(id));
@@ -89,7 +83,6 @@ export class Game {
       if (action === "save") void this.saveGame();
       else if (action === "load") void this.loadGame();
       else if (action === "new") void this.newGame();
-      else if (action === "toggle_engine") void this.toggleEngine();
     });
 
     this.loop = new Loop(
@@ -102,53 +95,25 @@ export class Game {
     this.onResize();
   }
 
-  async toggleEngine(): Promise<void> {
-    if (this.currentEngine === "three") {
-      await this.switchEngine("pixi");
-    } else {
-      await this.switchEngine("three");
+  /** 2.5D is the only renderer. Three.js View stays headless (asset baking). */
+  private async bootPixi(): Promise<void> {
+    this.canvas.style.display = "none";
+    this.pixiCanvas.style.display = "block";
+    if (!this.pixiView) {
+      this.pixiView = new PixiIsometricView();
+      await this.pixiView.init(this.pixiCanvas);
+      this.pixiView.bakeAssets(this.view.assets);
     }
-  }
-
-  async switchEngine(engine: "three" | "pixi"): Promise<void> {
-    this.currentEngine = engine;
-    if (engine === "pixi") {
-      this.canvas.style.display = "none";
-      this.pixiCanvas.style.display = "block";
-      if (!this.pixiView) {
-        this.pixiView = new PixiIsometricView();
-        await this.pixiView.init(this.pixiCanvas);
-        this.pixiView.bakeAssets(this.view.assets);
-      }
-      this.pixiView.buildWorld(this.world, this.state);
-      this.hud.setEngineMode("2.5D (Pixi.js)");
-      this.toast = { text: "Active: Pixi.js 2.5D Sprite Engine", until: performance.now() + 2500 };
-      this.hud.setToast(this.toast.text);
-    } else {
-      this.pixiCanvas.style.display = "none";
-      this.canvas.style.display = "block";
-      this.hud.setEngineMode("3D (Three.js)");
-      this.toast = { text: "Active: Three.js Orthographic 3D Engine", until: performance.now() + 2500 };
-      this.hud.setToast(this.toast.text);
-    }
-  }
-
-  private get cameraRig() {
-    return this.view.cameraRig;
+    this.pixiView.buildWorld(this.world, this.state);
   }
 
   async init(): Promise<void> {
     await this.view.loadAssets();
-    this.view.buildWorld(this.world, this.state);
     this.state.populateNodes();
-    this.view.refreshNodes(this.state, this.world);
     this.placeStarterSettlement();
-    this.view.updateCrops(this.state, this.world);
-    this.cameraRig.focusOn(0, 0, true);
     this.hud.setActiveTool("Build");
 
-    // Boot directly into Pixi.js 2.5D engine on this experiment branch
-    await this.switchEngine("pixi");
+    await this.bootPixi();
   }
 
   start(): void {
@@ -166,25 +131,22 @@ export class Game {
     const before = this.time.day * 24 + this.time.hour;
     this.time.advance(fixedDelta);
     const hours = this.time.day * 24 + this.time.hour - before;
-    this.simulation.tick(this.state, hours);
+    this.simulation.tick(this.state, hours, { daylight: this.time.daylight });
+    const notice = this.state.notices.shift();
+    if (notice) this.showToast(notice, 4000);
   }
 
   private render(delta: number): void {
-    if (this.currentEngine === "pixi" && this.pixiView) {
-      this.pixiView.update(this.time);
-    } else {
-      this.handleCameraInput(delta);
-      this.handleKeyEdges();
-      this.updateHover();
-      this.handleClicks();
-
-      this.view.updateCrops(this.state, this.world);
-      this.view.render(delta, this.time);
-    }
+    this.pixiView?.update(this.time, this.state);
+    this.handleKeyEdges();
+    this.handlePixiClicks();
+    this.updatePixiCamera(delta);
+    this.updateBuildGhost();
 
     this.hud.update(this.time, this.state);
     this.buildMenu.setAffordable((id) => this.state.canAfford(BUILDINGS[id].cost));
     this.updateInspector();
+    this.mainframe.refresh(this.mainframeReport(), this.state.aiTrust);
 
     if (this.toast && performance.now() > this.toast.until) {
       this.toast = null;
@@ -192,34 +154,7 @@ export class Game {
     }
   }
 
-  // ------------------------------------------------------------- camera
-
-  private handleCameraInput(delta: number): void {
-    const input = this.input;
-
-    const drag = input.consumeDrag();
-    if (drag.x !== 0 || drag.y !== 0) {
-      const scale = this.cameraRig.worldUnitsPerPixel;
-      this.cameraRig.panWorld(drag.x * scale, drag.y * scale);
-    }
-
-    const wheel = input.consumeWheel();
-    if (wheel !== 0) {
-      this.cameraRig.zoomBy(wheel * GameConfig.camera.zoomSensitivity);
-    }
-
-    if (input.moveRight !== 0 || input.moveForward !== 0) {
-      this.cameraRig.pan(input.moveRight, input.moveForward, delta);
-    }
-
-    const rotate = (input.has("e") ? 1 : 0) - (input.has("q") ? 1 : 0);
-    if (rotate !== 0) this.cameraRig.rotateBy(rotate * delta * 1.2);
-
-    if (input.has("1")) this.setSpeed(1);
-    if (input.has("2")) this.setSpeed(2);
-    if (input.has("3")) this.setSpeed(4);
-    if (input.has(" ")) this.setSpeed(0);
-  }
+  // ------------------------------------------------------------- input (2.5D)
 
   private handleKeyEdges(): void {
     for (const key of this.input.consumeKeyPresses()) {
@@ -231,82 +166,70 @@ export class Game {
       } else if (key === "escape") {
         this.cancelBuild();
         this.buildMenu.hide();
+        this.mainframe.hide();
         this.state.selected = null;
-        this.selection.clearSelection();
+        this.pixiView?.clearSelected();
         this.inspector.hide();
       }
     }
+    if (this.input.has("1")) this.setSpeed(1);
+    if (this.input.has("2")) this.setSpeed(2);
+    if (this.input.has("3")) this.setSpeed(4);
+    if (this.input.has(" ")) this.setSpeed(0);
+    // clear unconsumed drag/wheel (camera is owned by the Pixi view)
+    this.input.consumeDrag();
+    this.input.consumeWheel();
   }
 
-  // ------------------------------------------------------------- pointer
-
-  private updateHover(): void {
-    if (!this.input.pointerInside) {
-      this.selection.clearHover();
-      this.ghost.hide();
-      return;
-    }
-
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-
-    if (!this.buildId) {
-      const node = this.view.pickNode(this.input.pointerX, this.input.pointerY, width, height);
-      if (node) {
-        this.selection.setHover(node.gx, node.gy);
-        this.ghost.hide();
-        return;
-      }
-    }
-
-    const hit = this.picker.pick(this.input.pointerX, this.input.pointerY, width, height);
-    if (!hit) {
-      this.selection.clearHover();
-      this.ghost.hide();
-      return;
-    }
-
-    if (this.buildId) {
-      const def = BUILDINGS[this.buildId];
-      const swapped = this.rotation % 2 !== 0;
-      const size = swapped ? { w: def.size.h, h: def.size.w } : def.size;
-      const valid = this.state.canPlace(this.buildId, hit.gx, hit.gy, this.rotation);
-      this.ghost.show(this.buildId, hit.gx, hit.gy, this.rotation, valid);
-      this.selection.setHover(hit.gx, hit.gy, size.w, size.h);
-    } else {
-      this.ghost.hide();
-      this.selection.setHover(hit.gx, hit.gy);
-    }
-  }
-
-  private handleClicks(): void {
+  private handlePixiClicks(): void {
+    if (!this.pixiView) return;
     for (const click of this.input.consumeClicks()) {
       if (click.button === 2) {
         this.cancelBuild();
         continue;
       }
       if (click.button !== 0) continue;
-
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-
-      if (!this.buildId) {
-        const node = this.view.pickNode(click.x, click.y, width, height);
-        if (node) {
-          this.gather(node);
-          return;
-        }
+      const [gx, gy] = this.pixiView.screenToGrid(click.x, click.y);
+      if (!this.world.grid.inBounds(gx, gy)) continue;
+      const node = this.state.nodeAt(gx, gy);
+      if (node && !this.buildId) {
+        this.gather(node);
+        continue;
       }
-
-      const hit = this.picker.pick(click.x, click.y, width, height);
-      if (!hit) continue;
-
       if (this.buildId) {
-        this.tryPlace(this.buildId, hit.gx, hit.gy);
+        this.tryPlace(this.buildId, gx, gy);
       } else {
-        this.selectTile(hit.gx, hit.gy);
+        this.selectTile(gx, gy);
       }
     }
+  }
+
+  /** WASD/arrows pan the Pixi camera (drag + wheel are owned by the Pixi view). */
+  private updatePixiCamera(delta: number): void {
+    const { moveRight, moveForward } = this.input;
+    if ((moveRight !== 0 || moveForward !== 0) && this.pixiView) {
+      const speed = 520 * delta;
+      this.pixiView.panPixels(-moveRight * speed, moveForward * speed);
+    }
+  }
+
+  /** Green/red footprint ghost while a building is selected. */
+  private updateBuildGhost(): void {
+    if (!this.pixiView) return;
+    if (!this.buildId || !this.input.pointerInside) {
+      this.pixiView.clearBuildPreview();
+      return;
+    }
+    const [gx, gy] = this.pixiView.screenToGrid(this.input.pointerX, this.input.pointerY);
+    if (!this.world.grid.inBounds(gx, gy)) {
+      this.pixiView.clearBuildPreview();
+      return;
+    }
+    const def = BUILDINGS[this.buildId];
+    const swapped = this.rotation % 2 !== 0;
+    const w = swapped ? def.size.h : def.size.w;
+    const h = swapped ? def.size.w : def.size.h;
+    this.pixiView.setBuildPreview(gx, gy, w, h, this.state.canPlace(this.buildId, gx, gy, this.rotation));
   }
 
   // ------------------------------------------------------------- actions
@@ -317,8 +240,8 @@ export class Game {
     const label = result.resource.charAt(0).toUpperCase() + result.resource.slice(1);
     this.showToast(`+${result.amount.toFixed(0)} ${label}`);
     this.state.selected = { gx: node.gx, gy: node.gy };
-    this.view.refreshNodes(this.state, this.world);
-    if (!this.state.nodeAt(node.gx, node.gy)) this.selection.clearSelection();
+    this.pixiView?.syncFromState(this.world, this.state);
+    this.pixiView?.setSelected(node.gx, node.gy);
   }
 
   private onInspectorAction(id: string, payload?: unknown): void {
@@ -335,17 +258,18 @@ export class Game {
     if (id === "plant") {
       if (this.state.plant(building, target.plotIndex, this.selectedSeed)) {
         this.showToast(`Planted ${CROPS[this.selectedSeed].name}`);
-        this.view.updateCrops(this.state, this.world);
+        this.pixiView?.refreshFarmOverlays(this.state);
       }
     } else if (id === "water") {
       if (this.state.waterPlot(building, target.plotIndex)) {
         this.showToast("Watered plot");
+        this.pixiView?.refreshFarmOverlays(this.state);
       }
     } else if (id === "harvest") {
       const gained = this.state.harvest(building, target.plotIndex);
       if (gained > 0) {
         this.showToast(`+${gained.toFixed(0)} Food`);
-        this.view.updateCrops(this.state, this.world);
+        this.pixiView?.refreshFarmOverlays(this.state);
       }
     } else if (id === "gather") {
       const node = this.state.selected
@@ -358,8 +282,8 @@ export class Game {
   private tryPlace(id: BuildingId, gx: number, gy: number): void {
     if (!this.state.canPlace(id, gx, gy, this.rotation)) return;
     const placed = this.state.place(id, gx, gy, this.rotation);
-    this.view.addBuilding(placed, this.world);
-    this.view.updateCrops(this.state, this.world);
+    this.pixiView?.addBuildingSprite(placed, this.world);
+    this.pixiView?.refreshFarmOverlays(this.state);
     this.selectTile(gx, gy);
   }
 
@@ -371,10 +295,50 @@ export class Game {
     const size = def ? (swapped ? { w: def.size.h, h: def.size.w } : def.size) : { w: 1, h: 1 };
 
     if (building) {
-      this.selection.setSelection(building.gx, building.gy, size.w, size.h);
+      this.pixiView?.setSelected(building.gx, building.gy, size.w, size.h);
     } else {
-      this.selection.setSelection(gx, gy);
+      this.pixiView?.setSelected(gx, gy);
     }
+  }
+
+  // ------------------------------------------------------------- mainframe
+
+  private nowHours(): number {
+    return this.time.day * 24 + this.time.hour;
+  }
+
+  private mainframeReport(): MainframeReport {
+    return evaluateMainframe(this.state, this.nowHours());
+  }
+
+  private onMainframeAction(id: "accept" | "dismiss" | "why"): void {
+    if (id === "why") {
+      this.mainframe.toggleWhy();
+      this.mainframe.refresh(this.mainframeReport(), this.state.aiTrust);
+      return;
+    }
+    const advice = this.mainframeReport().advice;
+    if (!advice) return;
+    if (id === "accept") {
+      this.state.aiTrust = Math.min(100, this.state.aiTrust + 3);
+      this.state.morale = Math.min(100, this.state.morale + 1);
+      if (advice.action?.kind === "build") {
+        const name = BUILDINGS[advice.action.building].name;
+        this.beginBuild(advice.action.building);
+        this.buildMenu.show();
+        this.showToast(`Mainframe: place the ${name} where it fits best`);
+      } else {
+        this.showToast("Mainframe: noted. It will be watching.");
+      }
+    } else {
+      this.state.aiTrust = Math.max(0, this.state.aiTrust - 2);
+      this.state.advisorSnooze = {
+        id: advice.id,
+        untilHour: this.nowHours() + snoozeDuration(),
+      };
+      this.showToast("Recommendation dismissed. The Mainframe recalculates.");
+    }
+    this.mainframe.refresh(this.mainframeReport(), this.state.aiTrust);
   }
 
   // ------------------------------------------------------------- inspector
@@ -515,8 +479,8 @@ export class Game {
     };
   }
 
-  private showToast(text: string): void {
-    this.toast = { text, until: performance.now() + 1600 };
+  private showToast(text: string, duration = 1600): void {
+    this.toast = { text, until: performance.now() + duration };
     this.hud.setToast(this.toast.text);
   }
 
@@ -548,13 +512,11 @@ export class Game {
     this.time.day = data.time.day;
     this.time.update();
 
-    this.view.rebuildBuildings(this.state, this.world);
-    this.view.refreshNodes(this.state, this.world);
-    this.view.updateCrops(this.state, this.world);
+    this.pixiView?.syncFromState(this.world, this.state);
 
     this.cancelBuild();
     this.state.selected = null;
-    this.selection.clearSelection();
+    this.pixiView?.clearSelected();
     this.inspector.hide();
   }
 
@@ -563,12 +525,11 @@ export class Game {
     this.rotation = 0;
     this.buildMenu.setActive(id);
     this.state.selected = null;
-    this.selection.clearSelection();
+    this.pixiView?.clearSelected();
   }
 
   private cancelBuild(): void {
     this.buildId = null;
-    this.ghost.hide();
     this.buildMenu.setActive(null);
   }
 
@@ -594,8 +555,7 @@ export class Game {
           const gy = preferY + dy;
           if (!grid.inBounds(gx, gy)) continue;
           if (!this.state.canPlace(id, gx, gy, 0)) continue;
-          const placed = this.state.place(id, gx, gy, 0);
-          this.view.addBuilding(placed, this.world);
+          this.state.place(id, gx, gy, 0);
           return;
         }
       }
@@ -628,8 +588,7 @@ export class Game {
             const gy = baseY + dy;
             if (!grid.inBounds(gx, gy)) continue;
             if (!this.state.canPlace(id, gx, gy, 0)) continue;
-            const placed = this.state.place(id, gx, gy, 0);
-            this.view.addBuilding(placed, this.world);
+            this.state.place(id, gx, gy, 0);
             placedIds.push(`${id}@${gx},${gy}`);
             found = true;
             break;
@@ -639,6 +598,7 @@ export class Game {
       }
     });
 
+    this.pixiView?.syncFromState(this.world, this.state);
     return placedIds;
   }
 
