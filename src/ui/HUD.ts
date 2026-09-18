@@ -251,9 +251,9 @@ export class HUD {
     this.toast.hidden = true;
   }
 
-  setActiveTool(tool: string): void {
+  setActiveTool(tool: string | null): void {
     this.toolButtons.forEach((button, index) => {
-      button.classList.toggle("active", TOOLS[index]?.id === tool);
+      button.classList.toggle("active", tool !== null && TOOLS[index]?.id === tool);
     });
   }
 

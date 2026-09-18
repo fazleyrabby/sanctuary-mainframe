@@ -133,7 +133,6 @@ export class Game {
     await this.assets.load({ buildings, props });
     this.state.populateNodes();
     this.placeStarterSettlement();
-    this.hud.setActiveTool("Build");
 
     await this.bootPixi();
   }
@@ -332,6 +331,8 @@ export class Game {
     const placed = this.state.place(id, gx, gy, this.rotation);
     this.pixiView?.addBuildingSprite(placed, this.world);
     this.pixiView?.refreshFarmOverlays(this.state);
+    this.cancelBuild();
+    this.buildMenu.hide();
     this.selectTile(gx, gy);
   }
 
@@ -621,6 +622,7 @@ export class Game {
     this.buildId = id;
     this.rotation = 0;
     this.buildMenu.setActive(id);
+    this.hud.setActiveTool("Build");
     this.state.selected = null;
     this.pixiView?.clearSelected();
   }
@@ -628,6 +630,8 @@ export class Game {
   private cancelBuild(): void {
     this.buildId = null;
     this.buildMenu.setActive(null);
+    this.pixiView?.clearBuildPreview();
+    this.hud.setActiveTool(null);
   }
 
   private setSpeed(level: number): void {
