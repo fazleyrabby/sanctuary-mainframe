@@ -78,16 +78,15 @@ export class Game {
 
     this.hud.onTool((tool) => {
       if (tool === "Build") {
-        const visible = this.buildMenu.toggle();
-        if (!visible) this.cancelBuild();
+        this.toggleMenu("build");
       } else if (tool === "Farm") {
         this.focusNearestFarm();
       } else if (tool === "Research") {
-        this.researchPanel.toggle(this.state);
+        this.toggleMenu("research");
       } else if (tool === "Explore") {
-        this.expeditionPanel.toggle(this.state);
+        this.toggleMenu("expedition");
       } else if (tool === "AI") {
-        this.mainframe.toggle(this.mainframeReport(), this.state.aiTrust);
+        this.toggleMenu("ai");
       }
     });
     this.buildMenu.onSelect((id) => this.beginBuild(id));
@@ -192,29 +191,50 @@ export class Game {
     }
   }
 
-  // ------------------------------------------------------------- input (2.5D)
+  // ------------------------------------------------------------- menus (exclusive)
+
+  /** Only one menu visible at a time: opening one closes the rest. */
+  private toggleMenu(kind: "build" | "research" | "expedition" | "ai"): void {
+    const wasOpen =
+      kind === "build"
+        ? this.buildMenu.visible
+        : kind === "research"
+          ? this.researchPanel.isVisible
+          : kind === "expedition"
+            ? this.expeditionPanel.isVisible
+            : this.mainframe.visible;
+    this.closeAllMenus();
+    if (wasOpen) return;
+    if (kind === "build") this.buildMenu.show();
+    else if (kind === "research") this.researchPanel.show(this.state);
+    else if (kind === "expedition") this.expeditionPanel.show(this.state);
+    else this.mainframe.toggle(this.mainframeReport(), this.state.aiTrust);
+  }
+
+  private closeAllMenus(): void {
+    this.cancelBuild();
+    this.buildMenu.hide();
+    this.mainframe.hide();
+    this.researchPanel.hide();
+    this.expeditionPanel.hide();
+  }
 
   private handleKeyEdges(): void {
     for (const key of this.input.consumeKeyPresses()) {
       if (key === "b") {
-        const visible = this.buildMenu.toggle();
-        if (!visible) this.cancelBuild();
+        this.toggleMenu("build");
       } else if (key === "f") {
         this.focusNearestFarm();
       } else if (key === "t") {
-        this.researchPanel.toggle(this.state);
+        this.toggleMenu("research");
       } else if (key === "e") {
-        this.expeditionPanel.toggle(this.state);
+        this.toggleMenu("expedition");
       } else if (key === "m") {
-        this.mainframe.toggle(this.mainframeReport(), this.state.aiTrust);
+        this.toggleMenu("ai");
       } else if (key === "r") {
         this.rotation = (this.rotation + 1) % 4;
       } else if (key === "escape") {
-        this.cancelBuild();
-        this.buildMenu.hide();
-        this.mainframe.hide();
-        this.researchPanel.hide();
-        this.expeditionPanel.hide();
+        this.closeAllMenus();
         this.state.selected = null;
         this.pixiView?.clearSelected();
         this.inspector.hide();

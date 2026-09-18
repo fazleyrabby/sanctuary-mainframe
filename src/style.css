@@ -3,7 +3,7 @@
   --panel: rgba(14, 17, 16, 0.78);
   --panel-border: rgba(150, 170, 150, 0.18);
   --text: #d8ddd4;
-  --text-dim: #8b958a;
+  --text-dim: #9dab9f;
   --accent: #7fd6c2;
   --warn: #e0a94a;
   --danger: #d9664a;
@@ -162,7 +162,7 @@ body {
 }
 
 .phase-badge {
-  font-size: 8.5px;
+  font-size: 9px;
   color: var(--text-dim);
   letter-spacing: 0.16em;
 }
@@ -247,7 +247,7 @@ body {
 .res-pill.compute .res-dot { background: #7fd6c2; box-shadow: 0 0 6px rgba(127, 214, 194, 0.5); }
 
 .res-label {
-  font-size: 8.5px;
+  font-size: 9px;
   color: var(--text-dim);
   letter-spacing: 0.05em;
 }
@@ -259,7 +259,7 @@ body {
 }
 
 .res-rate {
-  font-size: 8.5px;
+  font-size: 9px;
   color: var(--text-dim);
 }
 
@@ -288,7 +288,7 @@ body {
 }
 
 .colony-lbl {
-  font-size: 8.5px;
+  font-size: 9px;
   color: var(--text-dim);
   letter-spacing: 0.06em;
 }
@@ -312,7 +312,7 @@ body {
   border: 1px solid rgba(127, 214, 194, 0.2);
   border-radius: 5px;
   background: rgba(255, 255, 255, 0.03);
-  color: var(--text-dim);
+  color: var(--text);
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.08em;
