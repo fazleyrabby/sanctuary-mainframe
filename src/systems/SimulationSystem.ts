@@ -120,12 +120,12 @@ export class SimulationSystem {
       if (e.once && state.eventsSeen.includes(e.id)) return false;
       if (e.minDay && day < e.minDay) return false;
       if (e.requiresPop && state.population < e.requiresPop) return false;
-      if (
-        e.requiresBuilding &&
+      if (e.requiresBuilding &&
         !state.buildings.some((b) => b.id === e.requiresBuilding)
       ) {
         return false;
       }
+      if (e.requiresAILevel && state.aiLevel < e.requiresAILevel) return false;
       return true;
     });
 
@@ -155,6 +155,44 @@ export class SimulationSystem {
           plot.water -= consumed;
           plot.progress = Math.min(1, plot.progress + (hours / def.growthHours) * lightScale);
           if (plot.progress >= 1) plot.ready = true;
+        }
+      }
+    }
+    // Automation (L3+): the Mainframe waters thirsty fields, keeping a reserve.
+    if (state.aiLevel >= 3) {
+      for (const building of state.buildings) {
+        for (const plot of building.plots) {
+          if (!plot.crop || plot.ready || plot.water > 0.05) continue;
+          if (state.resources.water <= 25) return;
+          const applied = Math.min(0.6, state.resources.water - 25, 1 - plot.water);
+          if (applied <= 0) continue;
+          state.resources.water -= applied;
+          plot.water = Math.min(1, plot.water + applied);
+        }
+      }
+    }
+    // Strategic autonomy (L5+): self-harvesting, self-planting fields.
+    if (state.aiLevel >= 5) {
+      for (const building of state.buildings) {
+        if (building.plots.length === 0) continue;
+        for (const plot of building.plots) {
+          if (plot.ready && state.aiPolicy.autoHarvest) {
+            state.add("food", CROPS[plot.crop ?? "wheat"].yieldFood);
+            plot.crop = null;
+            plot.progress = 0;
+            plot.water = 0;
+            plot.ready = false;
+          }
+          if (!plot.crop && state.aiPolicy.autoPlant) {
+            const seed = CROPS.wheat;
+            if (state.canAfford(seed.seedCost)) {
+              state.pay(seed.seedCost);
+              plot.crop = "wheat";
+              plot.progress = 0;
+              plot.water = 0.35;
+              plot.ready = false;
+            }
+          }
         }
       }
     }
@@ -215,6 +253,9 @@ export class SimulationSystem {
         } else if (hasSubNeural && (building.id === "serverRoom" || building.id === "aiCore") && item.resource === "compute") {
           perHour *= 1.3;
         }
+        // Optimization (L2+) and Governance (L6+): tuned output.
+        if (state.aiLevel >= 2) perHour *= 1.1;
+        if (state.aiLevel >= 6) perHour *= 1.1;
         state.add(item.resource, perHour * hours * scale);
       }
     }

@@ -16,11 +16,12 @@ import { BuildMenu } from "../ui/BuildMenu";
 import { FallenColonyModal } from "../ui/FallenColonyModal";
 import { HUD } from "../ui/HUD";
 import { InspectorPanel, type InspectorContent, type InspectorRow } from "../ui/InspectorPanel";
-import { MainframePanel } from "../ui/MainframePanel";
+import { MainframePanel, type MainframeAction, type MainframeView } from "../ui/MainframePanel";
+import { AI_LEVELS, requirementText } from "../data/aiLevels";
+import { TECHNOLOGIES, type TechDefinition, type TechId } from "../data/research";
 import { ResearchPanel } from "../ui/ResearchPanel";
 import { ExpeditionPanel } from "../ui/ExpeditionPanel";
 import { EventModal } from "../ui/EventModal";
-import { type TechDefinition } from "../data/research";
 import { type ExpeditionDefinition } from "../data/expeditions";
 import { World, terrainName } from "../world/World";
 import { EventBus } from "./Events";
@@ -179,7 +180,7 @@ export class Game {
     this.hud.update(this.time, this.state);
     this.buildMenu.setAffordable((id) => this.state.canAfford(BUILDINGS[id].cost));
     this.updateInspector();
-    this.mainframe.refresh(this.mainframeReport(), this.state.aiTrust);
+    this.mainframe.refresh(this.mainframeView());
     if (this.researchPanel.isVisible) {
       this.researchPanel.render(this.state);
     }
@@ -223,7 +224,7 @@ export class Game {
     if (kind === "build") this.buildMenu.show();
     else if (kind === "research") this.researchPanel.show(this.state);
     else if (kind === "expedition") this.expeditionPanel.show(this.state);
-    else this.mainframe.toggle(this.mainframeReport(), this.state.aiTrust);
+    else this.mainframe.toggle(this.mainframeView());
   }
 
   private closeAllMenus(): void {
@@ -433,10 +434,56 @@ export class Game {
     return evaluateMainframe(this.state, this.nowHours());
   }
 
-  private onMainframeAction(id: "accept" | "dismiss" | "why"): void {
+  private mainframeView(): MainframeView {
+    const next = this.state.nextAiLevel();
+    const levelDef = AI_LEVELS[this.state.aiLevel];
+    return {
+      report: this.mainframeReport(),
+      trust: this.state.aiTrust,
+      level: this.state.aiLevel,
+      levelName: levelDef?.name ?? "Unknown",
+      nextLevelName: next ? `Level ${next.level}: ${next.name}` : null,
+      ascendHint: next
+        ? requirementText(next, {
+            serverRooms: this.state.countBuildings("serverRoom"),
+            aiCores: this.state.countBuildings("aiCore"),
+            data: this.state.resources.data,
+            trust: this.state.aiTrust,
+            day: this.time.day,
+            techOk: next.requires.tech ? this.state.isResearched(next.requires.tech as TechId) : true,
+            techName: next.requires.tech ? TECHNOLOGIES[next.requires.tech as TechId]?.name ?? next.requires.tech : "",
+          })
+        : "MAXIMUM CAPABILITY",
+      canAscend: this.state.canAscend(this.time.day),
+      showPolicies: this.state.aiLevel >= 5,
+      autoPlant: this.state.aiPolicy.autoPlant,
+      autoHarvest: this.state.aiPolicy.autoHarvest,
+    };
+  }
+
+  private onMainframeAction(id: MainframeAction): void {
     if (id === "why") {
       this.mainframe.toggleWhy();
-      this.mainframe.refresh(this.mainframeReport(), this.state.aiTrust);
+      this.mainframe.refresh(this.mainframeView());
+      return;
+    }
+    if (id === "ascend") {
+      const name = this.state.ascendMainframe(this.time.day);
+      this.showToast(
+        name ? `Mainframe ascended: ${name}` : "Ascension requirements not yet met",
+      );
+      this.mainframe.refresh(this.mainframeView());
+      return;
+    }
+    if (id === "policy-plant" || id === "policy-harvest") {
+      if (this.state.aiLevel < 5) return;
+      if (id === "policy-plant") this.state.aiPolicy.autoPlant = !this.state.aiPolicy.autoPlant;
+      else this.state.aiPolicy.autoHarvest = !this.state.aiPolicy.autoHarvest;
+      const on = id === "policy-plant" ? this.state.aiPolicy.autoPlant : this.state.aiPolicy.autoHarvest;
+      this.showToast(
+        on ? "System delegated to the Mainframe." : "Control reclaimed by human hands.",
+      );
+      this.mainframe.refresh(this.mainframeView());
       return;
     }
     const advice = this.mainframeReport().advice;
@@ -460,7 +507,7 @@ export class Game {
       };
       this.showToast("Recommendation dismissed. The Mainframe recalculates.");
     }
-    this.mainframe.refresh(this.mainframeReport(), this.state.aiTrust);
+    this.mainframe.refresh(this.mainframeView());
   }
 
   // ------------------------------------------------------------- inspector
@@ -560,10 +607,17 @@ export class Game {
       const crop = CROPS[plot.crop];
       const stage = growthStage(plot.progress);
       const stageName = plot.ready ? "Ready" : ["Seedling", "Growing", "Ripening", "Mature"][stage];
+      // Analysis (L1+): the Mainframe forecasts each harvest.
+      let eta = "";
+      if (this.state.aiLevel >= 1 && !plot.ready && plot.water > 0) {
+        const rate = (0.25 + 0.75 * this.time.daylight) / crop.growthHours;
+        const hoursLeft = rate > 0 ? (1 - plot.progress) / rate : Number.POSITIVE_INFINITY;
+        eta = Number.isFinite(hoursLeft) ? ` · ripe ~${Math.max(1, Math.ceil(hoursLeft))}h` : "";
+      }
 
       return {
         label: `Plot ${index + 1}`,
-        detail: `${crop.name} · ${stageName} ${Math.round(plot.progress * 100)}% · water ${Math.round(plot.water * 100)}%`,
+        detail: `${crop.name} · ${stageName} ${Math.round(plot.progress * 100)}% · water ${Math.round(plot.water * 100)}%${eta}`,
         tone: plot.ready ? ("good" as const) : plot.water <= 0.02 ? ("bad" as const) : ("default" as const),
         actions: plot.ready
           ? [

@@ -10,6 +10,7 @@ import type { TechDefinition, TechId } from "../data/research";
 import type { ExpeditionId } from "../data/expeditions";
 import { EXPEDITIONS } from "../data/expeditions";
 import { EVENTS } from "../data/events";
+import { AI_LEVELS, MAX_AI_LEVEL } from "../data/aiLevels";
 import { Rng } from "../core/Rng";
 import { TerrainType, type World } from "../world/World";
 
@@ -73,6 +74,8 @@ export interface SerializedState {
   eventsSeen: string[];
   eventCount: number;
   lastEventHour: number;
+  aiLevel: number;
+  aiPolicy: { autoPlant: boolean; autoHarvest: boolean };
   nextUid: number;
   occupancy: Array<[string, number]>;
 }
@@ -123,6 +126,10 @@ export class GameState {
   fallen = false;
   /** 0–100. Rises when the Mainframe's advice is accepted, falls on dismissals and deaths. */
   aiTrust = 50;
+  /** Capability level 0–6 (PRD §24). Ascended by the player in the Mainframe panel. */
+  aiLevel = 0;
+  /** Delegated farm policies (Strategic AI, level 5+). */
+  aiPolicy = { autoPlant: true, autoHarvest: true };
   /** Dismissed advice stays quiet for a few game-hours. */
   advisorSnooze: { id: string; untilHour: number } | null = null;
   /** Researched technologies unlocking permanent colony perks. */
@@ -320,6 +327,42 @@ export class GameState {
     return this.researched.includes(id);
   }
 
+  countBuildings(id: BuildingId): number {
+    return this.buildings.filter((b) => b.id === id).length;
+  }
+
+  /** Next capability level definition, or null at the cap. */
+  nextAiLevel(): (typeof AI_LEVELS)[number] | null {
+    if (this.aiLevel >= MAX_AI_LEVEL) return null;
+    return AI_LEVELS[this.aiLevel + 1] ?? null;
+  }
+
+  /** True when every ascension requirement for the next level holds. */
+  canAscend(day: number): boolean {
+    const def = this.nextAiLevel();
+    if (!def) return false;
+    const r = def.requires;
+    if (r.serverRooms && this.countBuildings("serverRoom") < r.serverRooms) return false;
+    if (r.aiCores && this.countBuildings("aiCore") < r.aiCores) return false;
+    if (r.dataStockpile && this.resources.data < r.dataStockpile) return false;
+    if (r.tech && !this.isResearched(r.tech as TechId)) return false;
+    if (r.trust && this.aiTrust < r.trust) return false;
+    if (r.day && day < r.day) return false;
+    return true;
+  }
+
+  /** Claim the next level. Returns its name, or null when locked. */
+  ascendMainframe(day: number): string | null {
+    const def = this.nextAiLevel();
+    if (!def || !this.canAscend(day)) return null;
+    this.aiLevel = def.level;
+    this.aiTrust = Math.min(100, this.aiTrust + 5);
+    this.notices.push(
+      `MAINFRAME ASCENDED — Level ${def.level}: ${def.name}. ${def.description}`,
+    );
+    return def.name;
+  }
+
   /** Colonists not currently out on expedition. At least one must stay home. */
   availableWorkers(): number {
     const away = this.expeditions.reduce((n, e) => n + e.teamSize, 0);
@@ -423,6 +466,8 @@ export class GameState {
       eventsSeen: [...this.eventsSeen],
       eventCount: this.eventCount,
       lastEventHour: this.lastEventHour,
+      aiLevel: this.aiLevel,
+      aiPolicy: { ...this.aiPolicy },
       nextUid: this.nextUid,
       occupancy: [...this.occupancy.entries()],
     };
@@ -446,6 +491,8 @@ export class GameState {
     this.eventsSeen = data.eventsSeen ? [...data.eventsSeen] : [];
     this.eventCount = data.eventCount ?? 0;
     this.lastEventHour = data.lastEventHour ?? 0;
+    this.aiLevel = data.aiLevel ?? 0;
+    this.aiPolicy = data.aiPolicy ? { ...data.aiPolicy } : { autoPlant: true, autoHarvest: true };
     this.nextUid = data.nextUid;
     this.occupancy = new Map(data.occupancy);
     this.rates = zeroed();

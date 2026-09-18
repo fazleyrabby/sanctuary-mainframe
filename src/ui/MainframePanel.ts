@@ -1,6 +1,27 @@
 import type { MainframeReport } from "../systems/MainframeAdvisor";
 
-export type MainframeAction = "accept" | "dismiss" | "why";
+export type MainframeAction =
+  | "accept"
+  | "dismiss"
+  | "why"
+  | "ascend"
+  | "policy-plant"
+  | "policy-harvest";
+
+export interface MainframeView {
+  report: MainframeReport;
+  trust: number;
+  level: number;
+  levelName: string;
+  /** Null at the cap. */
+  nextLevelName: string | null;
+  /** Requirement progress line, or "MAXIMUM CAPABILITY". */
+  ascendHint: string;
+  canAscend: boolean;
+  showPolicies: boolean;
+  autoPlant: boolean;
+  autoHarvest: boolean;
+}
 
 /**
  * Sanctuary Mainframe interface panel (PRD §43).
@@ -10,6 +31,14 @@ export class MainframePanel {
   private root: HTMLElement;
   private statusDot: HTMLElement;
   private statusText: HTMLElement;
+  private levelText: HTMLElement;
+  private ascendBox: HTMLElement;
+  private ascendTitle: HTMLElement;
+  private ascendHint: HTMLElement;
+  private ascendBtn: HTMLButtonElement;
+  private policyBox: HTMLElement;
+  private policyPlantBtn: HTMLButtonElement;
+  private policyHarvestBtn: HTMLButtonElement;
   private priorityBox: HTMLElement;
   private adviceTitle: HTMLElement;
   private adviceDetail: HTMLElement;
@@ -45,6 +74,30 @@ export class MainframePanel {
     this.statusText = document.createElement("span");
     this.statusText.className = "mainframe-status";
     header.append(this.statusDot, title, this.statusText);
+
+    this.levelText = document.createElement("div");
+    this.levelText.className = "mainframe-level";
+
+    this.ascendBox = document.createElement("div");
+    this.ascendBox.className = "mainframe-ascend";
+    this.ascendTitle = document.createElement("div");
+    this.ascendTitle.className = "mainframe-ascend-title";
+    this.ascendHint = document.createElement("div");
+    this.ascendHint.className = "mainframe-ascend-hint";
+    this.ascendBtn = document.createElement("button");
+    this.ascendBtn.className = "mainframe-btn ascend";
+    this.ascendBtn.textContent = "ASCEND";
+    this.ascendBtn.addEventListener("click", () => this.onAction("ascend"));
+    this.ascendBox.append(this.ascendTitle, this.ascendHint, this.ascendBtn);
+
+    this.policyBox = document.createElement("div");
+    this.policyBox.className = "mainframe-policies";
+    const policyTitle = document.createElement("div");
+    policyTitle.className = "mainframe-policies-title";
+    policyTitle.textContent = "DELEGATED SYSTEMS";
+    this.policyPlantBtn = this.mkPolicyButton("Self-planting fields", "policy-plant");
+    this.policyHarvestBtn = this.mkPolicyButton("Self-harvesting fields", "policy-harvest");
+    this.policyBox.append(policyTitle, this.policyPlantBtn, this.policyHarvestBtn);
 
     this.priorityBox = document.createElement("div");
     this.priorityBox.className = "mainframe-priorities";
@@ -94,6 +147,9 @@ export class MainframePanel {
 
     this.root.append(
       header,
+      this.levelText,
+      this.ascendBox,
+      this.policyBox,
       this.priorityBox,
       this.adviceTitle,
       this.adviceDetail,
@@ -115,12 +171,12 @@ export class MainframePanel {
     this.whyVisible = false;
   }
 
-  toggle(report: MainframeReport, trust: number): boolean {
+  toggle(view: MainframeView): boolean {
     if (this.visible) {
       this.hide();
     } else {
       this.root.hidden = false;
-      this.render(report, trust);
+      this.render(view);
     }
     return this.visible;
   }
@@ -130,9 +186,9 @@ export class MainframePanel {
     this.key = "";
   }
 
-  refresh(report: MainframeReport, trust: number): void {
+  refresh(view: MainframeView): void {
     if (!this.visible) return;
-    this.render(report, trust);
+    this.render(view);
   }
 
   private mkButton(label: string, id: MainframeAction): HTMLButtonElement {
@@ -143,23 +199,48 @@ export class MainframePanel {
     return btn;
   }
 
-  private render(report: MainframeReport, trust: number): void {
-    const advice = report.advice;
+  private mkPolicyButton(label: string, id: MainframeAction): HTMLButtonElement {
+    const btn = document.createElement("button");
+    btn.className = "mainframe-policy-btn";
+    btn.addEventListener("click", () => this.onAction(id));
+    btn.dataset.label = label;
+    return btn;
+  }
+
+  private render(view: MainframeView): void {
+    const advice = view.report.advice;
     const nextKey = [
-      report.status,
+      view.report.status,
       advice?.id ?? "none",
-      Math.round(trust),
+      Math.round(view.trust),
+      view.level,
+      view.canAscend,
+      view.autoPlant,
+      view.autoHarvest,
       this.whyVisible ? "why" : "n why",
     ].join("|");
     if (nextKey === this.key) return;
     this.key = nextKey;
 
-    this.statusText.textContent = report.status;
-    this.statusText.dataset.tone = report.status;
-    this.statusDot.dataset.tone = report.status;
+    this.statusText.textContent = view.report.status;
+    this.statusText.dataset.tone = view.report.status;
+    this.statusDot.dataset.tone = view.report.status;
+    this.levelText.textContent = `LEVEL ${view.level} — ${view.levelName.toUpperCase()}`;
+
+    this.ascendTitle.textContent = view.nextLevelName
+      ? `Next: Level ${view.level + 1} — ${view.nextLevelName}`
+      : "Maximum capability reached";
+    this.ascendHint.textContent = view.ascendHint;
+    this.ascendBtn.disabled = !view.canAscend;
+    this.ascendBtn.textContent = view.canAscend ? "ASCEND" : "LOCKED";
+    this.ascendBox.classList.toggle("ready", view.canAscend);
+
+    this.policyBox.hidden = !view.showPolicies;
+    this.setPolicyButton(this.policyPlantBtn, "Self-planting fields", view.autoPlant);
+    this.setPolicyButton(this.policyHarvestBtn, "Self-harvesting fields", view.autoHarvest);
 
     this.priorityBox.replaceChildren();
-    for (const p of report.priorities.slice(0, 3)) {
+    for (const p of view.report.priorities.slice(0, 3)) {
       const row = document.createElement("div");
       row.className = "mainframe-priority";
       const label = document.createElement("span");
@@ -194,7 +275,12 @@ export class MainframePanel {
     this.whyBox.hidden = !this.whyVisible || !advice;
     this.whyBtn.classList.toggle("active", this.whyVisible);
 
-    this.trustFill.style.width = `${Math.round(trust)}%`;
-    this.trustLabel.textContent = `TRUST ${Math.round(trust)}`;
+    this.trustFill.style.width = `${Math.round(view.trust)}%`;
+    this.trustLabel.textContent = `TRUST ${Math.round(view.trust)}`;
+  }
+
+  private setPolicyButton(btn: HTMLButtonElement, label: string, on: boolean): void {
+    btn.textContent = `${on ? "◉" : "○"} ${label} — ${on ? "AI" : "HUMAN"}`;
+    btn.classList.toggle("ai", on);
   }
 }

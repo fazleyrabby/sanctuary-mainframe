@@ -180,6 +180,21 @@ export function evaluateMainframe(state: GameState, nowHours: number): Mainframe
       action: null,
     });
   }
+  const nextLevel = state.nextAiLevel();
+  if (nextLevel) {
+    const day = Math.floor(nowHours / 24) + 1;
+    if (state.canAscend(day)) {
+      candidates.unshift({
+        id: `ascend-${nextLevel.level}`,
+        title: `Ascend to Level ${nextLevel.level}: ${nextLevel.name}`,
+        detail: `Requirements met. Open the Mainframe panel (M) and claim it: ${nextLevel.description}`,
+        reason: `Every ascension requirement holds. Expanded capability compounds — delay costs the colony its edge.`,
+        alternative: `Ascend later. The requirements will keep.`,
+        confidence: 93,
+        action: null,
+      });
+    }
+  }
   candidates.push({
     id: "stable",
     title: "Hold the line",

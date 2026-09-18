@@ -36,6 +36,8 @@ export interface GameEvent {
   minDay?: number;
   requiresBuilding?: BuildingId;
   requiresPop?: number;
+  /** Minimum Mainframe capability level (threat projection comes online at L4). */
+  requiresAILevel?: number;
   /** Once-only story beats never repeat. */
   once?: boolean;
   options: EventOption[];
@@ -221,6 +223,7 @@ export const EVENTS: Record<string, GameEvent> = {
       "MAINFRAME: Scavenger movement triangulated on the eastern approach. Raid probability 72% within 12 hours. Recommend barricading the perimeter.",
     mainframe: true,
     minDay: 4,
+    requiresAILevel: 4,
     options: [
       {
         id: "barricade",
