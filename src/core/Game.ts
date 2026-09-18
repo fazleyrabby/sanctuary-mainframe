@@ -458,6 +458,7 @@ export class Game {
       showPolicies: this.state.aiLevel >= 5,
       autoPlant: this.state.aiPolicy.autoPlant,
       autoHarvest: this.state.aiPolicy.autoHarvest,
+      autoDefense: this.state.aiPolicy.autoDefense,
     };
   }
 
@@ -475,13 +476,23 @@ export class Game {
       this.mainframe.refresh(this.mainframeView());
       return;
     }
-    if (id === "policy-plant" || id === "policy-harvest") {
+    if (id === "policy-plant" || id === "policy-harvest" || id === "policy-defense") {
       if (this.state.aiLevel < 5) return;
       if (id === "policy-plant") this.state.aiPolicy.autoPlant = !this.state.aiPolicy.autoPlant;
-      else this.state.aiPolicy.autoHarvest = !this.state.aiPolicy.autoHarvest;
-      const on = id === "policy-plant" ? this.state.aiPolicy.autoPlant : this.state.aiPolicy.autoHarvest;
+      else if (id === "policy-harvest") this.state.aiPolicy.autoHarvest = !this.state.aiPolicy.autoHarvest;
+      else this.state.aiPolicy.autoDefense = !this.state.aiPolicy.autoDefense;
+      const on =
+        id === "policy-plant"
+          ? this.state.aiPolicy.autoPlant
+          : id === "policy-harvest"
+            ? this.state.aiPolicy.autoHarvest
+            : this.state.aiPolicy.autoDefense;
       this.showToast(
-        on ? "System delegated to the Mainframe." : "Control reclaimed by human hands.",
+        on
+          ? id === "policy-defense"
+            ? "Towers delegated. The Mainframe holds the walls."
+            : "System delegated to the Mainframe."
+          : "Control reclaimed by human hands.",
       );
       this.mainframe.refresh(this.mainframeView());
       return;

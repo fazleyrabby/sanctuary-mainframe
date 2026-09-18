@@ -6,7 +6,8 @@ export type MainframeAction =
   | "why"
   | "ascend"
   | "policy-plant"
-  | "policy-harvest";
+  | "policy-harvest"
+  | "policy-defense";
 
 export interface MainframeView {
   report: MainframeReport;
@@ -21,6 +22,7 @@ export interface MainframeView {
   showPolicies: boolean;
   autoPlant: boolean;
   autoHarvest: boolean;
+  autoDefense: boolean;
 }
 
 /**
@@ -39,6 +41,7 @@ export class MainframePanel {
   private policyBox: HTMLElement;
   private policyPlantBtn: HTMLButtonElement;
   private policyHarvestBtn: HTMLButtonElement;
+  private policyDefenseBtn: HTMLButtonElement;
   private priorityBox: HTMLElement;
   private adviceTitle: HTMLElement;
   private adviceDetail: HTMLElement;
@@ -97,7 +100,8 @@ export class MainframePanel {
     policyTitle.textContent = "DELEGATED SYSTEMS";
     this.policyPlantBtn = this.mkPolicyButton("Self-planting fields", "policy-plant");
     this.policyHarvestBtn = this.mkPolicyButton("Self-harvesting fields", "policy-harvest");
-    this.policyBox.append(policyTitle, this.policyPlantBtn, this.policyHarvestBtn);
+    this.policyDefenseBtn = this.mkPolicyButton("Automated tower defense", "policy-defense");
+    this.policyBox.append(policyTitle, this.policyPlantBtn, this.policyHarvestBtn, this.policyDefenseBtn);
 
     this.priorityBox = document.createElement("div");
     this.priorityBox.className = "mainframe-priorities";
@@ -217,6 +221,7 @@ export class MainframePanel {
       view.canAscend,
       view.autoPlant,
       view.autoHarvest,
+      view.autoDefense,
       this.whyVisible ? "why" : "n why",
     ].join("|");
     if (nextKey === this.key) return;
@@ -238,6 +243,7 @@ export class MainframePanel {
     this.policyBox.hidden = !view.showPolicies;
     this.setPolicyButton(this.policyPlantBtn, "Self-planting fields", view.autoPlant);
     this.setPolicyButton(this.policyHarvestBtn, "Self-harvesting fields", view.autoHarvest);
+    this.setPolicyButton(this.policyDefenseBtn, "Automated tower defense", view.autoDefense);
 
     this.priorityBox.replaceChildren();
     for (const p of view.report.priorities.slice(0, 3)) {

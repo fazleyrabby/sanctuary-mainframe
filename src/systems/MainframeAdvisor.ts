@@ -147,6 +147,31 @@ export function evaluateMainframe(state: GameState, nowHours: number): Mainframe
       action: { kind: "build", building: "campfire" },
     });
   }
+  const day = Math.floor(nowHours / 24) + 1;
+  const watchtowers = state.buildings.filter((b) => b.id === "watchtower").length;
+  const crossbows = state.buildings.filter((b) => b.id === "crossbowTower").length;
+  if (watchtowers === 0 && day >= 3) {
+    candidates.push({
+      id: "watch",
+      title: "Eyes on the horizon",
+      detail: `Build a Watchtower. Early warning halves what dust-wolves steal.`,
+      reason: `Siege pressure is climbing${state.threat >= 50 ? ` (threat ${Math.round(state.threat)}/100)` : ""}. Without eyes, the first attack arrives unannounced.`,
+      alternative: `Stay blind and eat the first loss — beasts teach fast.`,
+      confidence: 75,
+      action: { kind: "build", building: "watchtower" },
+    });
+  }
+  if (crossbows === 0 && (day >= 5 || state.threat >= 50)) {
+    candidates.push({
+      id: "towers",
+      title: "Raise the crossbows",
+      detail: `Build a Crossbow Tower. Powered towers break beasts and raiders alike.`,
+      reason: `Raiders probe richer colonies. Static defense turns a massacre into a fireworks show — at the cost of energy per engagement.`,
+      alternative: `Pay every attack in stores and blood instead.`,
+      confidence: 80,
+      action: { kind: "build", building: "crossbowTower" },
+    });
+  }
   if (readyPlots > 0) {
     candidates.push({
       id: "harvest",

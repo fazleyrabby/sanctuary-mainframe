@@ -7,7 +7,9 @@ export type BuildingId =
   | "workshop"
   | "generator"
   | "serverRoom"
-  | "aiCore";
+  | "aiCore"
+  | "watchtower"
+  | "crossbowTower";
 
 export type ResourceKey =
   | "food"
@@ -138,6 +140,23 @@ export const BUILDINGS: Record<BuildingId, BuildingDefinition> = {
     production: [{ resource: "compute", perHour: 7 }],
     consumption: [{ resource: "energy", perHour: 6 }],
   },
+  watchtower: {
+    id: "watchtower",
+    name: "Watchtower",
+    description: "A tall timber post. Spots dust-wolves and raiders while they are still distant.",
+    size: { w: 2, h: 2 },
+    cost: { wood: 40, stone: 20 },
+    requiresFlatGround: true,
+  },
+  crossbowTower: {
+    id: "crossbowTower",
+    name: "Crossbow Tower",
+    description: "A winched steel bow that drives off beasts and raiders. Drinks energy to stay spanned.",
+    size: { w: 2, h: 2 },
+    cost: { metal: 40, scrap: 30 },
+    requiresFlatGround: true,
+    consumption: [{ resource: "energy", perHour: 2 }],
+  },
 };
 
 export const BUILD_MENU: BuildingId[] = [
@@ -148,6 +167,8 @@ export const BUILD_MENU: BuildingId[] = [
   "campfire",
   "workshop",
   "generator",
+  "watchtower",
+  "crossbowTower",
   "serverRoom",
   "aiCore",
 ];

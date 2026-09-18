@@ -532,6 +532,11 @@ export class PixiIsometricView {
       this.addCampfireSprite(b);
       return;
     }
+    // Defense towers have no GLBs either — procedural timber/steel sprites.
+    if (b.id === "watchtower" || b.id === "crossbowTower") {
+      this.addTowerSprite(b);
+      return;
+    }
 
     const key = b.id === "waterCollector"
       ? "water_collector"
@@ -644,6 +649,81 @@ export class PixiIsometricView {
 
     this.objectsContainer.addChild(c);
     this.fires.push({ x: posX, y: posY - 14, flame, mid, core, glow, phase: (b.gx * 3 + b.gy * 7) % 6 });
+  }
+
+  /** Procedural defense towers (2×2): timber watchtower or steel crossbow tower. */
+  private addTowerSprite(b: PlacedBuilding): void {
+    const def = BUILDINGS[b.id];
+    const w = def?.size.w ?? 2;
+    const h = def?.size.h ?? 2;
+    const centerX = (b.gx + w / 2) * TILE_SIZE;
+    const baseY = (b.gy + h) * TILE_SIZE;
+    const isCrossbow = b.id === "crossbowTower";
+
+    const shadow = new Graphics();
+    shadow.ellipse(centerX + 3, baseY - 4, w * TILE_SIZE * 0.42, 10);
+    shadow.fill({ color: 0x140e0a, alpha: 0.32 });
+    this.shadowsContainer.addChild(shadow);
+
+    const c = new Container();
+    c.position.set(centerX, baseY);
+    c.zIndex = (b.gy + h) * 1000 + b.gx;
+    const g = new Graphics();
+
+    if (!isCrossbow) {
+      // Watchtower: four splayed legs, platform, railing, shingle cap, pennant.
+      g.moveTo(-14, 0); g.lineTo(-9, -34);
+      g.moveTo(14, 0); g.lineTo(9, -34);
+      g.moveTo(-6, 0); g.lineTo(-4, -34);
+      g.moveTo(6, 0); g.lineTo(4, -34);
+      g.stroke({ width: 3.5, color: 0x5d3a1e });
+      g.moveTo(-12, -18); g.lineTo(12, -18);
+      g.moveTo(-11, -26); g.lineTo(11, -26);
+      g.stroke({ width: 2, color: 0x4e2f16 });
+      g.roundRect(-13, -42, 26, 9, 2);
+      g.fill({ color: 0x8a5f36 });
+      g.rect(-13, -42, 26, 3);
+      g.fill({ color: 0xa3763f });
+      for (let i = -12; i <= 12; i += 6) {
+        g.rect(i - 1, -50, 2, 8);
+      }
+      g.fill({ color: 0x5d3a1e });
+      g.moveTo(-15, -42); g.lineTo(0, -56); g.lineTo(15, -42);
+      g.closePath();
+      g.fill({ color: 0x7a3b22 });
+      g.moveTo(0, -56); g.lineTo(0, -64);
+      g.stroke({ width: 1.6, color: 0x3a2812 });
+      g.moveTo(0, -64); g.lineTo(10, -61); g.lineTo(0, -58);
+      g.closePath();
+      g.fill({ color: 0xd9793b });
+    } else {
+      // Crossbow tower: stone drum, timber housing, spanned steel bow + bolt.
+      g.ellipse(0, -4, 16, 7);
+      g.fill({ color: 0x6e6e78 });
+      g.roundRect(-13, -22, 26, 19, 3);
+      g.fill({ color: 0x8f8f98 });
+      g.roundRect(-13, -22, 26, 6, 3);
+      g.fill({ color: 0xa9adb6 });
+      g.moveTo(-13, -13); g.lineTo(13, -13);
+      g.stroke({ width: 1.2, color: 0x5d5d66, alpha: 0.8 });
+      g.roundRect(-5, -34, 10, 13, 2);
+      g.fill({ color: 0x5d3a1e });
+      // spanned bow (arc) with loaded bolt, aimed skyward
+      g.moveTo(-13, -40);
+      g.quadraticCurveTo(0, -28, 13, -40);
+      g.stroke({ width: 2.4, color: 0xd8dee6 });
+      g.moveTo(0, -44); g.lineTo(0, -30);
+      g.stroke({ width: 2, color: 0x8a5f36 });
+      g.moveTo(0, -44); g.lineTo(-3, -40); g.lineTo(3, -40);
+      g.closePath();
+      g.fill({ color: 0xe8edf2 });
+      // winch glow: spanned and ready
+      g.circle(0, -28, 2);
+      g.fill({ color: 0x7fd6c2, alpha: 0.9 });
+    }
+
+    c.addChild(g);
+    this.objectsContainer.addChild(c);
   }
 
   addResourceNodeSprite(node: ResourceNode, _world: World): void {

@@ -42,6 +42,7 @@ export class SimulationSystem {
     this.updateResearch(state, hours);
     this.updateExpeditions(state, hours);
     this.updateEvents(state, ctx.nowHours);
+    this.updateThreats(state, hours, ctx.nowHours);
     this.updateCrops(state, hours, ctx.daylight);
     this.updateIndustry(state, hours);
     this.updateColony(state, hours, isNight);
@@ -138,6 +139,74 @@ export class SimulationSystem {
     state.notices.push(
       pick.mainframe ? "MAINFRAME requests a decision." : "Something demands your attention.",
     );
+  }
+
+  /**
+   * Siege pressure: wealth attracts teeth. Builds toward 100, then
+   * discharges as dust-wolves (early) or raiders (later). Crossbow
+   * towers engage when powered and not stood down; watchtowers give
+   * early warning and halve beast losses. Deterministic.
+   */
+  private updateThreats(state: GameState, hours: number, nowHours: number): void {
+    const day = Math.floor(nowHours / 24) + 1;
+    const stocks =
+      state.resources.food + state.resources.water + state.resources.scrap +
+      state.resources.wood + state.resources.metal + state.resources.stone;
+    const wealth = stocks / 200 + state.buildings.length * 0.15 + state.population * 0.2;
+    state.threat = Math.min(100, state.threat + hours * (0.55 + wealth * 0.12));
+
+    const watchtowers = state.buildings.filter((b) => b.id === "watchtower").length;
+    if (state.threat >= 70 && !state.threatWarned && watchtowers > 0) {
+      state.threatWarned = true;
+      state.notices.push("Watchtower spots dust on the horizon — something is coming.");
+    }
+    if (state.threat < 100) return;
+
+    const towers = state.buildings.filter((b) => b.id === "crossbowTower").length;
+    const beasts = state.threatCount === 0 || day < 6;
+    const roll = expeditionHash(state.threatCount, day);
+    const stoodDown = state.aiLevel >= 5 && !state.aiPolicy.autoDefense;
+    const energyCost = towers * (beasts ? 3 : 4);
+    const engaged =
+      towers > 0 && !stoodDown && state.resources.energy >= Math.max(energyCost, 1);
+
+    if (beasts) {
+      if (engaged) {
+        state.resources.energy = Math.max(0, state.resources.energy - energyCost);
+        state.morale = Math.min(100, state.morale + 2);
+        state.notices.push("Dust-wolves probed the perimeter — the crossbows sang, and the pack fled.");
+      } else {
+        let loss = Math.round(12 + roll * 8);
+        if (watchtowers > 0) loss = Math.ceil(loss / 2);
+        state.resources.food = Math.max(0, state.resources.food - loss);
+        state.morale = Math.max(0, state.morale - 4);
+        state.notices.push(
+          watchtowers > 0
+            ? `Dust-wolves tore at the stores (−${loss} food), but the watchtower's warning saved half.`
+            : `Dust-wolves tore through the stores (−${loss} food). A watchtower would have warned us.`,
+        );
+      }
+    } else {
+      if (engaged) {
+        state.resources.energy = Math.max(0, state.resources.energy - energyCost);
+        state.morale = Math.min(100, state.morale + 2);
+        state.notices.push("Raiders tested the walls and broke on crossbow fire. The colony stands.");
+      } else {
+        const scrapLoss = Math.round(15 + roll * 10);
+        const woodLoss = Math.round(10 + roll * 8);
+        state.resources.scrap = Math.max(0, state.resources.scrap - scrapLoss);
+        state.resources.wood = Math.max(0, state.resources.wood - woodLoss);
+        state.health = Math.max(0, state.health - 6);
+        state.morale = Math.max(0, state.morale - 5);
+        state.notices.push(
+          `Raiders hit at moonrise (−${scrapLoss} scrap, −${woodLoss} wood, wounded colonists). Towers would have held them.`,
+        );
+      }
+    }
+
+    state.threat = 25 + expeditionHash(state.threatCount, 5) * 10;
+    state.threatWarned = false;
+    state.threatCount += 1;
   }
 
   private updateCrops(state: GameState, hours: number, daylight: number): void {

@@ -74,8 +74,11 @@ export interface SerializedState {
   eventsSeen: string[];
   eventCount: number;
   lastEventHour: number;
+  threat: number;
+  threatWarned: boolean;
+  threatCount: number;
   aiLevel: number;
-  aiPolicy: { autoPlant: boolean; autoHarvest: boolean };
+  aiPolicy: { autoPlant: boolean; autoHarvest: boolean; autoDefense: boolean };
   nextUid: number;
   occupancy: Array<[string, number]>;
 }
@@ -124,12 +127,16 @@ export class GameState {
   notices: string[] = [];
   /** True once every colonist is gone. Sandbox continues; warnings say to start over. */
   fallen = false;
+  /** 0–100 siege pressure. Discharges as beasts, then raiders. */
+  threat = 35;
+  threatWarned = false;
+  threatCount = 0;
   /** 0–100. Rises when the Mainframe's advice is accepted, falls on dismissals and deaths. */
   aiTrust = 50;
   /** Capability level 0–6 (PRD §24). Ascended by the player in the Mainframe panel. */
   aiLevel = 0;
   /** Delegated farm policies (Strategic AI, level 5+). */
-  aiPolicy = { autoPlant: true, autoHarvest: true };
+  aiPolicy = { autoPlant: true, autoHarvest: true, autoDefense: true };
   /** Dismissed advice stays quiet for a few game-hours. */
   advisorSnooze: { id: string; untilHour: number } | null = null;
   /** Researched technologies unlocking permanent colony perks. */
@@ -466,6 +473,9 @@ export class GameState {
       eventsSeen: [...this.eventsSeen],
       eventCount: this.eventCount,
       lastEventHour: this.lastEventHour,
+      threat: this.threat,
+      threatWarned: this.threatWarned,
+      threatCount: this.threatCount,
       aiLevel: this.aiLevel,
       aiPolicy: { ...this.aiPolicy },
       nextUid: this.nextUid,
@@ -491,8 +501,17 @@ export class GameState {
     this.eventsSeen = data.eventsSeen ? [...data.eventsSeen] : [];
     this.eventCount = data.eventCount ?? 0;
     this.lastEventHour = data.lastEventHour ?? 0;
+    this.threat = data.threat ?? 35;
+    this.threatWarned = data.threatWarned ?? false;
+    this.threatCount = data.threatCount ?? 0;
     this.aiLevel = data.aiLevel ?? 0;
-    this.aiPolicy = data.aiPolicy ? { ...data.aiPolicy } : { autoPlant: true, autoHarvest: true };
+    this.aiPolicy = data.aiPolicy
+      ? {
+          autoPlant: data.aiPolicy.autoPlant ?? true,
+          autoHarvest: data.aiPolicy.autoHarvest ?? true,
+          autoDefense: data.aiPolicy.autoDefense ?? true,
+        }
+      : { autoPlant: true, autoHarvest: true, autoDefense: true };
     this.nextUid = data.nextUid;
     this.occupancy = new Map(data.occupancy);
     this.rates = zeroed();
