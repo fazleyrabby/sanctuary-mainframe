@@ -1300,6 +1300,113 @@ body {
   background: transparent;
 }
 
+/* Event modal — consequential decisions, must choose (no dismiss) */
+.event-modal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 6, 5, 0.62);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  z-index: 120;
+}
+
+.event-modal[hidden] {
+  display: none !important;
+}
+
+.event-dialog {
+  width: min(460px, 92vw);
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  padding: 22px 24px;
+  background: rgba(10, 13, 11, 0.97);
+  border: 1px solid rgba(224, 169, 74, 0.45);
+  border-radius: 10px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8);
+}
+
+.event-modal.mainframe-event .event-dialog {
+  border-color: rgba(143, 184, 255, 0.5);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8), 0 0 32px rgba(120, 140, 255, 0.1) inset;
+}
+
+.event-kicker {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--warn);
+  margin-bottom: 6px;
+}
+
+.event-modal.mainframe-event .event-kicker {
+  color: #b9c8ff;
+}
+
+.event-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.event-story {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.event-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.event-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-family: var(--sans);
+  cursor: pointer;
+  text-align: left;
+  transition: all 140ms ease;
+}
+
+.event-btn:hover:not(:disabled) {
+  border-color: var(--warn);
+  background: rgba(224, 169, 74, 0.1);
+}
+
+.event-modal.mainframe-event .event-btn:hover:not(:disabled) {
+  border-color: #8fb8ff;
+  background: rgba(143, 184, 255, 0.12);
+}
+
+.event-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.event-btn-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.event-btn-cost {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--warn);
+}
+
 /* Scout expeditions — amber field-ops theme, mirrors research modal */
 .expedition-panel {
   position: absolute;

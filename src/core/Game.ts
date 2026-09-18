@@ -19,6 +19,7 @@ import { InspectorPanel, type InspectorContent, type InspectorRow } from "../ui/
 import { MainframePanel } from "../ui/MainframePanel";
 import { ResearchPanel } from "../ui/ResearchPanel";
 import { ExpeditionPanel } from "../ui/ExpeditionPanel";
+import { EventModal } from "../ui/EventModal";
 import { type TechDefinition } from "../data/research";
 import { type ExpeditionDefinition } from "../data/expeditions";
 import { World, terrainName } from "../world/World";
@@ -44,6 +45,7 @@ export class Game {
   private mainframe: MainframePanel;
   private researchPanel: ResearchPanel;
   private expeditionPanel: ExpeditionPanel;
+  private eventModal: EventModal;
   private fallenModal: FallenColonyModal;
   private loop: Loop;
   private events = new EventBus();
@@ -74,6 +76,9 @@ export class Game {
     this.mainframe = new MainframePanel(uiRoot, (id) => this.onMainframeAction(id));
     this.researchPanel = new ResearchPanel(uiRoot, (tech) => this.startResearch(tech));
     this.expeditionPanel = new ExpeditionPanel(uiRoot, (site) => this.dispatchExpedition(site));
+    this.eventModal = new EventModal(uiRoot, (eventId, optionId) =>
+      this.resolveEvent(eventId, optionId),
+    );
     this.fallenModal = new FallenColonyModal(uiRoot, () => void this.newGame());
 
     this.hud.onTool((tool) => {
@@ -156,7 +161,10 @@ export class Game {
     const before = this.time.day * 24 + this.time.hour;
     this.time.advance(fixedDelta);
     const hours = this.time.day * 24 + this.time.hour - before;
-    this.simulation.tick(this.state, hours, { daylight: this.time.daylight });
+    this.simulation.tick(this.state, hours, {
+      daylight: this.time.daylight,
+      nowHours: this.time.day * 24 + this.time.hour,
+    });
     const notice = this.state.notices.shift();
     if (notice) this.showToast(notice, 4000);
   }
@@ -183,6 +191,13 @@ export class Game {
       this.fallenModal.show(this.time.day);
     } else {
       this.fallenModal.hide();
+    }
+
+    // Fired story events wait for a decision (Escape never dismisses these).
+    if (this.state.activeEventId && !this.state.fallen) {
+      this.eventModal.show(this.state.activeEventId, this.state);
+    } else if (!this.state.activeEventId) {
+      this.eventModal.hide();
     }
 
     if (this.toast && performance.now() > this.toast.until) {
@@ -608,7 +623,6 @@ export class Game {
       this.showToast("Cannot start research (check requirements/costs)");
     }
   }
-
   private dispatchExpedition(site: ExpeditionDefinition): void {
     const sent = this.state.dispatchExpedition(site.id);
     if (sent) {
@@ -619,6 +633,17 @@ export class Game {
     } else {
       this.showToast("Cannot dispatch (need crew home, rations, and no team there)");
     }
+  }
+
+  private resolveEvent(eventId: string, optionId: string): void {
+    const result = this.state.applyEventOption(eventId, optionId);
+    if (result === null) {
+      this.showToast("That option is no longer affordable");
+      return;
+    }
+    this.eventModal.hide();
+    this.pixiView?.refreshFarmOverlays(this.state);
+    this.showToast(result, 4500);
   }
 
   private showToast(text: string, duration = 1600): void {

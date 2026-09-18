@@ -3,9 +3,11 @@ import { CROPS } from "../data/crops";
 import { TECHNOLOGIES } from "../data/research";
 import {
   EXPEDITIONS,
+  expeditionHash,
   expeditionInjury,
   lootVariance,
 } from "../data/expeditions";
+import { EVENT_IDS, EVENTS } from "../data/events";
 import type { GameState } from "../state/GameState";
 
 const FOOD_PER_PERSON_HOUR = 0.5;
@@ -29,6 +31,8 @@ const LOW_THRESHOLD: Partial<Record<ResourceKey, number>> = {
 export interface SimContext {
   /** 0 (deep night) .. 1 (full day). */
   daylight: number;
+  /** Absolute game clock in hours (day * 24 + hour). */
+  nowHours: number;
 }
 
 export class SimulationSystem {
@@ -37,6 +41,7 @@ export class SimulationSystem {
     const isNight = ctx.daylight < 0.2;
     this.updateResearch(state, hours);
     this.updateExpeditions(state, hours);
+    this.updateEvents(state, ctx.nowHours);
     this.updateCrops(state, hours, ctx.daylight);
     this.updateIndustry(state, hours);
     this.updateColony(state, hours, isNight);
@@ -98,6 +103,41 @@ export class SimulationSystem {
       const done = new Set(finished);
       state.expeditions = state.expeditions.filter((e) => !done.has(e));
     }
+  }
+
+  /**
+   * Event director: every ~26–40 game-hours (deterministic), fire one
+   * eligible event. Pure function of play history — no RNG.
+   */
+  private updateEvents(state: GameState, nowHours: number): void {
+    if (state.activeEventId) return;
+    const interval = 26 + expeditionHash(state.eventCount, 3) * 14;
+    if (nowHours - state.lastEventHour < interval) return;
+
+    const day = Math.floor(nowHours / 24) + 1;
+    const eligible = EVENT_IDS.map((id) => EVENTS[id]).filter((e) => {
+      if (!e) return false;
+      if (e.once && state.eventsSeen.includes(e.id)) return false;
+      if (e.minDay && day < e.minDay) return false;
+      if (e.requiresPop && state.population < e.requiresPop) return false;
+      if (
+        e.requiresBuilding &&
+        !state.buildings.some((b) => b.id === e.requiresBuilding)
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    state.lastEventHour = nowHours;
+    if (eligible.length === 0) return;
+    const pick = eligible[Math.floor(expeditionHash(state.eventCount, day) * eligible.length)];
+    if (!pick) return;
+    state.activeEventId = pick.id;
+    state.eventCount += 1;
+    state.notices.push(
+      pick.mainframe ? "MAINFRAME requests a decision." : "Something demands your attention.",
+    );
   }
 
   private updateCrops(state: GameState, hours: number, daylight: number): void {

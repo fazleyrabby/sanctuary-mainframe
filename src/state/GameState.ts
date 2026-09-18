@@ -9,6 +9,7 @@ import { NODES, type NodeKind } from "../data/resources";
 import type { TechDefinition, TechId } from "../data/research";
 import type { ExpeditionId } from "../data/expeditions";
 import { EXPEDITIONS } from "../data/expeditions";
+import { EVENTS } from "../data/events";
 import { Rng } from "../core/Rng";
 import { TerrainType, type World } from "../world/World";
 
@@ -68,6 +69,10 @@ export interface SerializedState {
   activeResearch: ActiveResearch | null;
   expeditions: ActiveExpedition[];
   expeditionCount: number;
+  activeEventId: string | null;
+  eventsSeen: string[];
+  eventCount: number;
+  lastEventHour: number;
   nextUid: number;
   occupancy: Array<[string, number]>;
 }
@@ -127,6 +132,12 @@ export class GameState {
   /** Expedition teams currently in the field. */
   expeditions: ActiveExpedition[] = [];
   expeditionCount = 0;
+  /** Fired event awaiting a player decision (persisted across reloads). */
+  activeEventId: string | null = null;
+  /** Once-only events already resolved. */
+  eventsSeen: string[] = [];
+  eventCount = 0;
+  lastEventHour = 0;
 
   private occupancy = new Map<string, number>();
   private nextUid = 1;
@@ -336,6 +347,50 @@ export class GameState {
     return true;
   }
 
+  /**
+   * Resolve a fired event option. Returns the outcome narrative,
+   * or null when costs can't be paid (button should have been disabled).
+   */
+  applyEventOption(eventId: string, optionId: string): string | null {
+    const event = EVENTS[eventId];
+    const option = event?.options.find((o) => o.id === optionId);
+    if (!event || !option) return null;
+    for (const c of option.cost ?? []) {
+      if (this.resources[c.resource] < c.amount) return null;
+    }
+    for (const c of option.cost ?? []) {
+      this.resources[c.resource] = Math.max(0, this.resources[c.resource] - c.amount);
+    }
+    for (const g of option.gains ?? []) {
+      this.add(g.resource, g.amount);
+    }
+    if (option.morale) {
+      this.morale = Math.min(100, Math.max(0, this.morale + option.morale));
+    }
+    if (option.health) {
+      this.health = Math.min(100, Math.max(0, this.health + option.health));
+    }
+    if (option.trust) {
+      this.aiTrust = Math.min(100, Math.max(0, this.aiTrust + option.trust));
+    }
+    if (option.population) {
+      // Events never kill: the wastes take, starvation takes lives.
+      this.population = Math.max(1, this.population + option.population);
+    }
+    if (option.cropProgress) {
+      for (const b of this.buildings) {
+        for (const p of b.plots) {
+          if (p.crop && !p.ready) {
+            p.progress = Math.min(1, Math.max(0, p.progress + option.cropProgress));
+          }
+        }
+      }
+    }
+    this.eventsSeen.push(eventId);
+    if (this.activeEventId === eventId) this.activeEventId = null;
+    return option.result;
+  }
+
   startResearch(tech: TechDefinition): boolean {
     if (this.isResearched(tech.id)) return false;
     if (this.activeResearch && this.activeResearch.id === tech.id) return false;
@@ -364,6 +419,10 @@ export class GameState {
       activeResearch: this.activeResearch ? { ...this.activeResearch } : null,
       expeditions: this.expeditions.map((e) => ({ ...e })),
       expeditionCount: this.expeditionCount,
+      activeEventId: this.activeEventId,
+      eventsSeen: [...this.eventsSeen],
+      eventCount: this.eventCount,
+      lastEventHour: this.lastEventHour,
       nextUid: this.nextUid,
       occupancy: [...this.occupancy.entries()],
     };
@@ -383,6 +442,10 @@ export class GameState {
     this.activeResearch = data.activeResearch ? { ...data.activeResearch } : null;
     this.expeditions = data.expeditions ? data.expeditions.map((e) => ({ ...e })) : [];
     this.expeditionCount = data.expeditionCount ?? 0;
+    this.activeEventId = data.activeEventId ?? null;
+    this.eventsSeen = data.eventsSeen ? [...data.eventsSeen] : [];
+    this.eventCount = data.eventCount ?? 0;
+    this.lastEventHour = data.lastEventHour ?? 0;
     this.nextUid = data.nextUid;
     this.occupancy = new Map(data.occupancy);
     this.rates = zeroed();
