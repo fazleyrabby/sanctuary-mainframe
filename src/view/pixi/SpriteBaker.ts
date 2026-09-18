@@ -4,7 +4,7 @@ import {
   DirectionalLight,
   HemisphereLight,
   OrthographicCamera,
-  PCFSoftShadowMap,
+  PCFShadowMap,
   PlaneGeometry,
   Mesh,
   Scene,
@@ -92,7 +92,7 @@ export class SpriteBaker {
       preserveDrawingBuffer: true,
     });
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = PCFSoftShadowMap;
+    this.renderer.shadowMap.type = PCFShadowMap;
 
     this.scene = new Scene();
 

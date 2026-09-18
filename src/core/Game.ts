@@ -119,7 +119,6 @@ export class Game {
       "generator",
       "server_room",
       "ai_core",
-      "campfire",
     ];
     const props = [
       "dead_tree",

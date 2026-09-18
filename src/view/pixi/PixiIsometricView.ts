@@ -149,7 +149,6 @@ export class PixiIsometricView {
       "generator",
       "server_room",
       "ai_core",
-      "campfire",
     ];
     const props = [
       "dead_tree",
