@@ -6,6 +6,7 @@ import {
 } from "../data/buildings";
 import { CROPS, type CropId } from "../data/crops";
 import { NODES, type NodeKind } from "../data/resources";
+import type { TechDefinition, TechId } from "../data/research";
 import { Rng } from "../core/Rng";
 import { TerrainType, type World } from "../world/World";
 
@@ -38,6 +39,11 @@ export interface TileRef {
   gy: number;
 }
 
+export interface ActiveResearch {
+  id: TechId;
+  progressHours: number;
+}
+
 export interface SerializedState {
   resources: Record<ResourceKey, number>;
   buildings: PlacedBuilding[];
@@ -48,6 +54,8 @@ export interface SerializedState {
   fallen: boolean;
   aiTrust: number;
   advisorSnooze: { id: string; untilHour: number } | null;
+  researched: TechId[];
+  activeResearch: ActiveResearch | null;
   nextUid: number;
   occupancy: Array<[string, number]>;
 }
@@ -100,6 +108,10 @@ export class GameState {
   aiTrust = 50;
   /** Dismissed advice stays quiet for a few game-hours. */
   advisorSnooze: { id: string; untilHour: number } | null = null;
+  /** Researched technologies unlocking permanent colony perks. */
+  researched: TechId[] = [];
+  /** Active research project in progress. */
+  activeResearch: ActiveResearch | null = null;
 
   private occupancy = new Map<string, number>();
   private nextUid = 1;
@@ -278,6 +290,23 @@ export class GameState {
     return gained;
   }
 
+  isResearched(id: TechId): boolean {
+    return this.researched.includes(id);
+  }
+
+  startResearch(tech: TechDefinition): boolean {
+    if (this.isResearched(tech.id)) return false;
+    if (this.activeResearch && this.activeResearch.id === tech.id) return false;
+    // Check prerequisites
+    const prereqsMet = tech.prerequisites.every((p) => this.isResearched(p));
+    if (!prereqsMet) return false;
+    if (!this.canAfford(tech.cost)) return false;
+
+    this.pay(tech.cost);
+    this.activeResearch = { id: tech.id, progressHours: 0 };
+    return true;
+  }
+
   serialize(): SerializedState {
     return {
       resources: { ...this.resources },
@@ -289,6 +318,8 @@ export class GameState {
       fallen: this.fallen,
       aiTrust: this.aiTrust,
       advisorSnooze: this.advisorSnooze ? { ...this.advisorSnooze } : null,
+      researched: [...this.researched],
+      activeResearch: this.activeResearch ? { ...this.activeResearch } : null,
       nextUid: this.nextUid,
       occupancy: [...this.occupancy.entries()],
     };
@@ -304,6 +335,8 @@ export class GameState {
     this.fallen = data.fallen ?? false;
     this.aiTrust = data.aiTrust ?? 50;
     this.advisorSnooze = data.advisorSnooze ? { ...data.advisorSnooze } : null;
+    this.researched = data.researched ? [...data.researched] : [];
+    this.activeResearch = data.activeResearch ? { ...data.activeResearch } : null;
     this.nextUid = data.nextUid;
     this.occupancy = new Map(data.occupancy);
     this.rates = zeroed();

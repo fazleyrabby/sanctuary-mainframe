@@ -1,5 +1,6 @@
 import { BUILDINGS, type ResourceKey } from "../data/buildings";
 import { CROPS } from "../data/crops";
+import { TECHNOLOGIES } from "../data/research";
 import type { GameState } from "../state/GameState";
 
 const FOOD_PER_PERSON_HOUR = 0.5;
@@ -29,15 +30,37 @@ export class SimulationSystem {
   tick(state: GameState, hours: number, ctx: SimContext): void {
     if (state.fallen) return;
     const isNight = ctx.daylight < 0.2;
+    this.updateResearch(state, hours);
     this.updateCrops(state, hours, ctx.daylight);
     this.updateIndustry(state, hours);
     this.updateColony(state, hours, isNight);
     this.updateRates(state);
   }
 
+  private updateResearch(state: GameState, hours: number): void {
+    if (!state.activeResearch) return;
+    const tech = TECHNOLOGIES[state.activeResearch.id];
+    if (!tech) {
+      state.activeResearch = null;
+      return;
+    }
+
+    // Compute surplus bonus accelerates research speed (up to +50% speed)
+    const computeBonus = state.resources.compute > 20 ? 1.25 : 1.0;
+    state.activeResearch.progressHours += hours * computeBonus;
+
+    if (state.activeResearch.progressHours >= tech.researchHours) {
+      state.researched.push(tech.id);
+      state.activeResearch = null;
+      state.notices.push(`Research Complete: ${tech.name}! ${tech.perkSummary}`);
+    }
+  }
+
   private updateCrops(state: GameState, hours: number, daylight: number): void {
     // Plants rest at night: growth scales with light.
-    const lightScale = 0.25 + 0.75 * daylight;
+    // Bio-Agronomy perk: +25% crop growth speed
+    const agriBonus = state.isResearched("bio_agronomy") ? 1.25 : 1.0;
+    const lightScale = (0.25 + 0.75 * daylight) * agriBonus;
     for (const building of state.buildings) {
       for (const plot of building.plots) {
         if (!plot.crop || plot.ready) continue;
@@ -54,12 +77,19 @@ export class SimulationSystem {
   }
 
   private updateIndustry(state: GameState, hours: number): void {
-    const need = new Map<ResourceKey, number>();
+    const hasHydro = state.isResearched("hydro_recycling");
+    const hasCompactor = state.isResearched("scrap_compactor");
+    const hasSubNeural = state.isResearched("sub_neural_algorithms");
 
+    const need = new Map<ResourceKey, number>();
     for (const building of state.buildings) {
       const def = BUILDINGS[building.id];
       for (const item of def.consumption ?? []) {
-        need.set(item.resource, (need.get(item.resource) ?? 0) + item.perHour * hours);
+        let perHour = item.perHour;
+        if (hasHydro && building.id === "waterCollector" && item.resource === "energy") {
+          perHour *= 0.8;
+        }
+        need.set(item.resource, (need.get(item.resource) ?? 0) + perHour * hours);
       }
     }
 
@@ -69,7 +99,7 @@ export class SimulationSystem {
         scaleFor.set(resource, 1);
         continue;
       }
-      scaleFor.set(resource, Math.min(1, state.resources[resource] / amount));
+      scaleFor.set(resource, Math.min(1, (state.resources[resource] ?? 0) / amount));
     }
 
     for (const building of state.buildings) {
@@ -83,13 +113,25 @@ export class SimulationSystem {
       if (scale <= 0) continue;
 
       for (const item of def.consumption ?? []) {
+        let perHour = item.perHour;
+        if (hasHydro && building.id === "waterCollector" && item.resource === "energy") {
+          perHour *= 0.8;
+        }
         state.resources[item.resource] = Math.max(
           0,
-          state.resources[item.resource] - item.perHour * hours * scale,
+          state.resources[item.resource] - perHour * hours * scale,
         );
       }
       for (const item of def.production ?? []) {
-        state.add(item.resource, item.perHour * hours * scale);
+        let perHour = item.perHour;
+        if (hasHydro && building.id === "waterCollector" && item.resource === "water") {
+          perHour *= 1.35;
+        } else if (hasCompactor && building.id === "workshop" && item.resource === "metal") {
+          perHour *= 1.5;
+        } else if (hasSubNeural && (building.id === "serverRoom" || building.id === "aiCore") && item.resource === "compute") {
+          perHour *= 1.3;
+        }
+        state.add(item.resource, perHour * hours * scale);
       }
     }
   }
@@ -114,12 +156,16 @@ export class SimulationSystem {
     }
 
     // Night: cold dread, unless the campfire burns.
+    // Thermal Aerogel Insulation perk: -50% night cold morale loss
     if (isNight && state.population > 0) {
       const hasFire = state.buildings.some((b) => b.id === "campfire");
       if (hasFire) {
         state.morale = Math.min(100, state.morale + CAMPFIRE_NIGHT_COMFORT * hours);
       } else {
-        state.morale = Math.max(0, state.morale - NIGHT_COLD_DRAIN * hours);
+        const coldDrain = state.isResearched("reinforced_insulation")
+          ? NIGHT_COLD_DRAIN * 0.5
+          : NIGHT_COLD_DRAIN;
+        state.morale = Math.max(0, state.morale - coldDrain * hours);
       }
     }
 
@@ -157,10 +203,24 @@ export class SimulationSystem {
       compute: 0,
     };
 
+    const hasHydro = state.isResearched("hydro_recycling");
+    const hasCompactor = state.isResearched("scrap_compactor");
+    const hasSubNeural = state.isResearched("sub_neural_algorithms");
+
     for (const building of state.buildings) {
       const def = BUILDINGS[building.id];
-      for (const item of def.production ?? []) rates[item.resource] += item.perHour;
-      for (const item of def.consumption ?? []) rates[item.resource] -= item.perHour;
+      for (const item of def.production ?? []) {
+        let perHour = item.perHour;
+        if (hasHydro && building.id === "waterCollector" && item.resource === "water") perHour *= 1.35;
+        else if (hasCompactor && building.id === "workshop" && item.resource === "metal") perHour *= 1.5;
+        else if (hasSubNeural && (building.id === "serverRoom" || building.id === "aiCore") && item.resource === "compute") perHour *= 1.3;
+        rates[item.resource] += perHour;
+      }
+      for (const item of def.consumption ?? []) {
+        let perHour = item.perHour;
+        if (hasHydro && building.id === "waterCollector" && item.resource === "energy") perHour *= 0.8;
+        rates[item.resource] -= perHour;
+      }
     }
 
     rates.food -= state.population * FOOD_PER_PERSON_HOUR;

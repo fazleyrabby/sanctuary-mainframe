@@ -17,6 +17,8 @@ import { FallenColonyModal } from "../ui/FallenColonyModal";
 import { HUD } from "../ui/HUD";
 import { InspectorPanel, type InspectorContent, type InspectorRow } from "../ui/InspectorPanel";
 import { MainframePanel } from "../ui/MainframePanel";
+import { ResearchPanel } from "../ui/ResearchPanel";
+import { type TechDefinition } from "../data/research";
 import { World, terrainName } from "../world/World";
 import { EventBus } from "./Events";
 import { GameConfig } from "./GameConfig";
@@ -38,6 +40,7 @@ export class Game {
   private buildMenu: BuildMenu;
   private inspector: InspectorPanel;
   private mainframe: MainframePanel;
+  private researchPanel: ResearchPanel;
   private fallenModal: FallenColonyModal;
   private loop: Loop;
   private events = new EventBus();
@@ -66,6 +69,7 @@ export class Game {
     this.buildMenu = new BuildMenu(uiRoot);
     this.inspector = new InspectorPanel(uiRoot, (id, payload) => this.onInspectorAction(id, payload));
     this.mainframe = new MainframePanel(uiRoot, (id) => this.onMainframeAction(id));
+    this.researchPanel = new ResearchPanel(uiRoot, (tech) => this.startResearch(tech));
     this.fallenModal = new FallenColonyModal(uiRoot, () => void this.newGame());
 
     this.hud.onTool((tool) => {
@@ -74,6 +78,8 @@ export class Game {
         if (!visible) this.cancelBuild();
       } else if (tool === "Farm") {
         this.focusNearestFarm();
+      } else if (tool === "Research") {
+        this.researchPanel.toggle(this.state);
       } else if (tool === "AI") {
         this.mainframe.toggle(this.mainframeReport(), this.state.aiTrust);
       }
@@ -163,6 +169,9 @@ export class Game {
     this.buildMenu.setAffordable((id) => this.state.canAfford(BUILDINGS[id].cost));
     this.updateInspector();
     this.mainframe.refresh(this.mainframeReport(), this.state.aiTrust);
+    if (this.researchPanel.isVisible) {
+      this.researchPanel.render(this.state);
+    }
 
     if (this.state.fallen) {
       this.fallenModal.show(this.time.day);
@@ -185,12 +194,17 @@ export class Game {
         if (!visible) this.cancelBuild();
       } else if (key === "f") {
         this.focusNearestFarm();
+      } else if (key === "t") {
+        this.researchPanel.toggle(this.state);
+      } else if (key === "m") {
+        this.mainframe.toggle(this.mainframeReport(), this.state.aiTrust);
       } else if (key === "r") {
         this.rotation = (this.rotation + 1) % 4;
       } else if (key === "escape") {
         this.cancelBuild();
         this.buildMenu.hide();
         this.mainframe.hide();
+        this.researchPanel.hide();
         this.state.selected = null;
         this.pixiView?.clearSelected();
         this.inspector.hide();
@@ -551,6 +565,16 @@ export class Game {
         { label: "Buildable", value: buildable ? "Yes" : "No", tone: buildable ? "good" : "bad" },
       ],
     };
+  }
+
+  private startResearch(tech: TechDefinition): void {
+    const started = this.state.startResearch(tech);
+    if (started) {
+      this.showToast(`Research initiated: ${tech.name}`);
+      this.researchPanel.render(this.state);
+    } else {
+      this.showToast("Cannot start research (check requirements/costs)");
+    }
   }
 
   private showToast(text: string, duration = 1600): void {

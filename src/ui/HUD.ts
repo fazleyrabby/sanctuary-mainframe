@@ -31,7 +31,7 @@ interface ToolDef {
 const TOOLS: ToolDef[] = [
   { id: "Build", label: "BUILD", key: "B" },
   { id: "Farm", label: "FARM", key: "F" },
-  { id: "Research", label: "TECH", key: "T", disabled: true, hint: "Research systems still offline" },
+  { id: "Research", label: "TECH", key: "T" },
   { id: "Explore", label: "SCOUT", key: "E", disabled: true, hint: "Scouting parties still organizing" },
   { id: "AI", label: "MAINFRAME", key: "M" },
 ];

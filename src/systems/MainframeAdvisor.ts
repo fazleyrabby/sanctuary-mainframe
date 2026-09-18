@@ -169,6 +169,17 @@ export function evaluateMainframe(state: GameState, nowHours: number): Mainframe
       action: null,
     });
   }
+  if (!state.activeResearch && state.resources.data >= 25 && state.resources.compute >= 15) {
+    candidates.push({
+      id: "research",
+      title: "Initiate technological research",
+      detail: `Colony holds ${Math.floor(state.resources.data)} data and ${Math.floor(state.resources.compute)} compute. Open TECH tree (T) to unlock upgrades.`,
+      reason: `Compute cores and data caches sit idle. Research accelerates crop yield, water efficiency, and insulation.`,
+      alternative: `Conserve data and compute for future expansions.`,
+      confidence: 72,
+      action: null,
+    });
+  }
   candidates.push({
     id: "stable",
     title: "Hold the line",
