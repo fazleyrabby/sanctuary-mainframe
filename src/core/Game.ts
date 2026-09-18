@@ -295,6 +295,17 @@ export class Game {
         this.showToast(`+${gained.toFixed(0)} Food`);
         this.pixiView?.refreshFarmOverlays(this.state);
       }
+    } else if (id === "dismantle") {
+      const def = BUILDINGS[building.id];
+      const refund = this.state.removeBuilding(building);
+      const refundStr = Object.entries(refund)
+        .map(([k, v]) => `+${v} ${k}`)
+        .join(", ");
+      this.showToast(`Dismantled ${def.name}${refundStr ? ` (${refundStr})` : ""}`);
+      this.pixiView?.syncFromState(this.world, this.state);
+      this.state.selected = null;
+      this.pixiView?.clearSelected();
+      this.inspector.hide();
     } else if (id === "gather") {
       const node = this.state.selected
         ? this.state.nodeAt(this.state.selected.gx, this.state.selected.gy)
@@ -449,8 +460,20 @@ export class Game {
     }
     if (def.housing) rows.push({ label: "Housing", value: `${def.housing}` });
 
+    const dismantleAction = {
+      id: "dismantle",
+      label: "Dismantle (50% Refund)",
+      payload: { uid: building.uid },
+      tone: "bad" as const,
+    };
+
     if (building.plots.length === 0) {
-      return { title: def.name, subtitle: "Structure", rows };
+      return {
+        title: def.name,
+        subtitle: "Structure",
+        rows,
+        actions: [dismantleAction],
+      };
     }
 
     const planted = building.plots.filter((p) => p.crop).length;
@@ -509,6 +532,7 @@ export class Game {
         label: CROPS[id].name,
         active: id === this.selectedSeed,
       })),
+      actions: [dismantleAction],
       plots,
     };
   }

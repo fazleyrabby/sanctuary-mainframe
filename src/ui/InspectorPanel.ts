@@ -129,8 +129,9 @@ export class InspectorPanel {
       row.className = "inspector-actions";
       for (const action of content.actions) {
         const button = document.createElement("button");
-        button.className = "action-button";
+        button.className = `action-button${action.tone ? ` ${action.tone}` : ""}`;
         button.textContent = action.label;
+        if (action.disabled) button.disabled = true;
         button.addEventListener("click", () => this.onAction(action.id, action.payload));
         row.append(button);
         this.actionButtons.set(action.id, button);

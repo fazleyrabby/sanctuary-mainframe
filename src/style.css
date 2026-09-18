@@ -534,6 +534,17 @@ body {
   background: rgba(127, 214, 194, 0.18);
 }
 
+.action-button.bad {
+  border-color: rgba(217, 102, 74, 0.5);
+  color: var(--danger);
+  background: rgba(217, 102, 74, 0.08);
+}
+
+.action-button.bad:hover:not(:disabled) {
+  background: rgba(217, 102, 74, 0.22);
+  border-color: rgba(217, 102, 74, 0.8);
+}
+
 .action-button:disabled {
   opacity: 0.35;
   cursor: not-allowed;

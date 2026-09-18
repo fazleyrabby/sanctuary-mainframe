@@ -192,6 +192,34 @@ export class GameState {
     return building;
   }
 
+  /** Dismantle a building, freeing occupancy and refunding 50% of construction cost. */
+  removeBuilding(building: PlacedBuilding): Record<string, number> {
+    const def = BUILDINGS[building.id];
+    const size = building.rotation % 2 === 0 ? def.size : { w: def.size.h, h: def.size.w };
+
+    // Free grid occupancy
+    for (let dy = 0; dy < size.h; dy += 1) {
+      for (let dx = 0; dx < size.w; dx += 1) {
+        this.occupancy.delete(`${building.gx + dx},${building.gy + dy}`);
+      }
+    }
+
+    // Remove from placed buildings
+    this.buildings = this.buildings.filter((b) => b.uid !== building.uid);
+
+    // 50% salvage refund (rounded up to nearest integer)
+    const refund: Record<string, number> = {};
+    for (const [key, cost] of Object.entries(def.cost)) {
+      if (cost && cost > 0) {
+        const amount = Math.ceil(cost * 0.5);
+        this.add(key as ResourceKey, amount);
+        refund[key] = amount;
+      }
+    }
+
+    return refund;
+  }
+
   buildingAt(gx: number, gy: number): PlacedBuilding | null {
     const uid = this.occupancy.get(`${gx},${gy}`);
     if (uid === undefined) return null;
