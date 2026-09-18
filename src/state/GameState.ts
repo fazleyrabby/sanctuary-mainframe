@@ -7,6 +7,8 @@ import {
 import { CROPS, type CropId } from "../data/crops";
 import { NODES, type NodeKind } from "../data/resources";
 import type { TechDefinition, TechId } from "../data/research";
+import type { ExpeditionId } from "../data/expeditions";
+import { EXPEDITIONS } from "../data/expeditions";
 import { Rng } from "../core/Rng";
 import { TerrainType, type World } from "../world/World";
 
@@ -44,6 +46,14 @@ export interface ActiveResearch {
   progressHours: number;
 }
 
+export interface ActiveExpedition {
+  siteId: ExpeditionId;
+  progressHours: number;
+  teamSize: number;
+  /** Monotonic counter feeding deterministic loot/injury rolls. */
+  dispatchIndex: number;
+}
+
 export interface SerializedState {
   resources: Record<ResourceKey, number>;
   buildings: PlacedBuilding[];
@@ -56,6 +66,8 @@ export interface SerializedState {
   advisorSnooze: { id: string; untilHour: number } | null;
   researched: TechId[];
   activeResearch: ActiveResearch | null;
+  expeditions: ActiveExpedition[];
+  expeditionCount: number;
   nextUid: number;
   occupancy: Array<[string, number]>;
 }
@@ -112,6 +124,9 @@ export class GameState {
   researched: TechId[] = [];
   /** Active research project in progress. */
   activeResearch: ActiveResearch | null = null;
+  /** Expedition teams currently in the field. */
+  expeditions: ActiveExpedition[] = [];
+  expeditionCount = 0;
 
   private occupancy = new Map<string, number>();
   private nextUid = 1;
@@ -294,6 +309,33 @@ export class GameState {
     return this.researched.includes(id);
   }
 
+  /** Colonists not currently out on expedition. At least one must stay home. */
+  availableWorkers(): number {
+    const away = this.expeditions.reduce((n, e) => n + e.teamSize, 0);
+    return this.population - away;
+  }
+
+  canDispatch(siteId: ExpeditionId): boolean {
+    const def = EXPEDITIONS[siteId];
+    if (this.expeditions.some((e) => e.siteId === siteId)) return false;
+    if (this.availableWorkers() - def.teamSize < 1) return false;
+    return this.canAfford(def.cost);
+  }
+
+  dispatchExpedition(siteId: ExpeditionId): boolean {
+    if (!this.canDispatch(siteId)) return false;
+    const def = EXPEDITIONS[siteId];
+    this.pay(def.cost);
+    this.expeditions.push({
+      siteId,
+      progressHours: 0,
+      teamSize: def.teamSize,
+      dispatchIndex: this.expeditionCount,
+    });
+    this.expeditionCount += 1;
+    return true;
+  }
+
   startResearch(tech: TechDefinition): boolean {
     if (this.isResearched(tech.id)) return false;
     if (this.activeResearch && this.activeResearch.id === tech.id) return false;
@@ -320,6 +362,8 @@ export class GameState {
       advisorSnooze: this.advisorSnooze ? { ...this.advisorSnooze } : null,
       researched: [...this.researched],
       activeResearch: this.activeResearch ? { ...this.activeResearch } : null,
+      expeditions: this.expeditions.map((e) => ({ ...e })),
+      expeditionCount: this.expeditionCount,
       nextUid: this.nextUid,
       occupancy: [...this.occupancy.entries()],
     };
@@ -337,6 +381,8 @@ export class GameState {
     this.advisorSnooze = data.advisorSnooze ? { ...data.advisorSnooze } : null;
     this.researched = data.researched ? [...data.researched] : [];
     this.activeResearch = data.activeResearch ? { ...data.activeResearch } : null;
+    this.expeditions = data.expeditions ? data.expeditions.map((e) => ({ ...e })) : [];
+    this.expeditionCount = data.expeditionCount ?? 0;
     this.nextUid = data.nextUid;
     this.occupancy = new Map(data.occupancy);
     this.rates = zeroed();

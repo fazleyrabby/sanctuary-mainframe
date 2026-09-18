@@ -1,6 +1,11 @@
 import { BUILDINGS, type ResourceKey } from "../data/buildings";
 import { CROPS } from "../data/crops";
 import { TECHNOLOGIES } from "../data/research";
+import {
+  EXPEDITIONS,
+  expeditionInjury,
+  lootVariance,
+} from "../data/expeditions";
 import type { GameState } from "../state/GameState";
 
 const FOOD_PER_PERSON_HOUR = 0.5;
@@ -31,6 +36,7 @@ export class SimulationSystem {
     if (state.fallen) return;
     const isNight = ctx.daylight < 0.2;
     this.updateResearch(state, hours);
+    this.updateExpeditions(state, hours);
     this.updateCrops(state, hours, ctx.daylight);
     this.updateIndustry(state, hours);
     this.updateColony(state, hours, isNight);
@@ -53,6 +59,44 @@ export class SimulationSystem {
       state.researched.push(tech.id);
       state.activeResearch = null;
       state.notices.push(`Research Complete: ${tech.name}! ${tech.perkSummary}`);
+    }
+  }
+
+  private updateExpeditions(state: GameState, hours: number): void {
+    if (state.expeditions.length === 0) return;
+    const finished: typeof state.expeditions = [];
+    for (const exp of state.expeditions) {
+      exp.progressHours += hours;
+      const def = EXPEDITIONS[exp.siteId];
+      if (!def || exp.progressHours < def.durationHours) continue;
+      finished.push(exp);
+
+      // Deposit loot with deterministic variance.
+      const hauls = def.loot.map((item, i) => {
+        const gained = state.add(
+          item.resource,
+          Math.round(item.amount * lootVariance(exp.dispatchIndex, i)),
+        );
+        return `+${gained} ${item.resource}`;
+      });
+
+      let tail = `${def.flavor} Haul: ${hauls.join(", ")}.`;
+      if (def.recruits > 0) {
+        state.population += def.recruits;
+        tail += ` ${def.recruits} survivor${def.recruits > 1 ? "s join" : " joins"} the colony!`;
+      }
+      if (expeditionInjury(exp.dispatchIndex, def.danger)) {
+        state.health = Math.max(0, state.health - 12);
+        state.morale = Math.max(0, state.morale - 5);
+        tail += ` The team took a beating getting out — tend the wounded.`;
+      } else {
+        state.morale = Math.min(100, state.morale + 4);
+      }
+      state.notices.push(`Expedition returned: ${def.name}. ${tail}`);
+    }
+    if (finished.length > 0) {
+      const done = new Set(finished);
+      state.expeditions = state.expeditions.filter((e) => !done.has(e));
     }
   }
 

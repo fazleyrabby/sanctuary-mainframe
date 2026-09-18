@@ -1300,3 +1300,129 @@ body {
   background: transparent;
 }
 
+/* Scout expeditions — amber field-ops theme, mirrors research modal */
+.expedition-panel {
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(840px, 94vw);
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  padding: 18px 22px;
+  background: rgba(14, 12, 8, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(224, 169, 74, 0.35);
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75), 0 0 28px rgba(224, 169, 74, 0.08) inset;
+  z-index: 95;
+  font-family: var(--sans);
+}
+
+.expedition-panel[hidden] {
+  display: none !important;
+}
+
+.expedition-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(224, 169, 74, 0.2);
+}
+
+.expedition-title {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: #f0c987;
+}
+
+.expedition-badge {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(224, 169, 74, 0.15);
+  border: 1px solid rgba(224, 169, 74, 0.3);
+  color: #f0c987;
+}
+
+.expedition-active-box {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: rgba(224, 169, 74, 0.08);
+  border: 1px solid rgba(224, 169, 74, 0.25);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.active-expedition-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.active-expedition-title-row .active-name {
+  color: #f0c987;
+  letter-spacing: 0.05em;
+}
+
+.expedition-bar {
+  margin-bottom: 6px;
+}
+
+.expedition-fill {
+  background: linear-gradient(90deg, #b07828, #f0c987) !important;
+  box-shadow: 0 0 10px rgba(240, 201, 135, 0.5) !important;
+}
+
+.expedition-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.expedition-card:hover {
+  border-color: rgba(224, 169, 74, 0.4) !important;
+  background: rgba(224, 169, 74, 0.04) !important;
+}
+
+.expedition-danger {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: #6fe08a;
+}
+
+.expedition-danger.d3 {
+  color: var(--warn);
+}
+
+.expedition-danger.d4,
+.expedition-danger.d5 {
+  color: var(--danger);
+}
+
+.expedition-loot {
+  color: #f0c987 !important;
+}
+
+.expedition-btn {
+  border-color: rgba(224, 169, 74, 0.4) !important;
+  color: #f0c987 !important;
+}
+
+.expedition-btn:hover:not(:disabled) {
+  background: rgba(224, 169, 74, 0.15) !important;
+}
+

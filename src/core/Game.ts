@@ -18,7 +18,9 @@ import { HUD } from "../ui/HUD";
 import { InspectorPanel, type InspectorContent, type InspectorRow } from "../ui/InspectorPanel";
 import { MainframePanel } from "../ui/MainframePanel";
 import { ResearchPanel } from "../ui/ResearchPanel";
+import { ExpeditionPanel } from "../ui/ExpeditionPanel";
 import { type TechDefinition } from "../data/research";
+import { type ExpeditionDefinition } from "../data/expeditions";
 import { World, terrainName } from "../world/World";
 import { EventBus } from "./Events";
 import { GameConfig } from "./GameConfig";
@@ -41,6 +43,7 @@ export class Game {
   private inspector: InspectorPanel;
   private mainframe: MainframePanel;
   private researchPanel: ResearchPanel;
+  private expeditionPanel: ExpeditionPanel;
   private fallenModal: FallenColonyModal;
   private loop: Loop;
   private events = new EventBus();
@@ -70,6 +73,7 @@ export class Game {
     this.inspector = new InspectorPanel(uiRoot, (id, payload) => this.onInspectorAction(id, payload));
     this.mainframe = new MainframePanel(uiRoot, (id) => this.onMainframeAction(id));
     this.researchPanel = new ResearchPanel(uiRoot, (tech) => this.startResearch(tech));
+    this.expeditionPanel = new ExpeditionPanel(uiRoot, (site) => this.dispatchExpedition(site));
     this.fallenModal = new FallenColonyModal(uiRoot, () => void this.newGame());
 
     this.hud.onTool((tool) => {
@@ -80,6 +84,8 @@ export class Game {
         this.focusNearestFarm();
       } else if (tool === "Research") {
         this.researchPanel.toggle(this.state);
+      } else if (tool === "Explore") {
+        this.expeditionPanel.toggle(this.state);
       } else if (tool === "AI") {
         this.mainframe.toggle(this.mainframeReport(), this.state.aiTrust);
       }
@@ -170,6 +176,9 @@ export class Game {
     if (this.researchPanel.isVisible) {
       this.researchPanel.render(this.state);
     }
+    if (this.expeditionPanel.isVisible) {
+      this.expeditionPanel.render(this.state);
+    }
 
     if (this.state.fallen) {
       this.fallenModal.show(this.time.day);
@@ -194,6 +203,8 @@ export class Game {
         this.focusNearestFarm();
       } else if (key === "t") {
         this.researchPanel.toggle(this.state);
+      } else if (key === "e") {
+        this.expeditionPanel.toggle(this.state);
       } else if (key === "m") {
         this.mainframe.toggle(this.mainframeReport(), this.state.aiTrust);
       } else if (key === "r") {
@@ -203,6 +214,7 @@ export class Game {
         this.buildMenu.hide();
         this.mainframe.hide();
         this.researchPanel.hide();
+        this.expeditionPanel.hide();
         this.state.selected = null;
         this.pixiView?.clearSelected();
         this.inspector.hide();
@@ -574,6 +586,18 @@ export class Game {
       this.researchPanel.render(this.state);
     } else {
       this.showToast("Cannot start research (check requirements/costs)");
+    }
+  }
+
+  private dispatchExpedition(site: ExpeditionDefinition): void {
+    const sent = this.state.dispatchExpedition(site.id);
+    if (sent) {
+      this.showToast(
+        `Expedition dispatched: ${site.name} (${site.teamSize} scout${site.teamSize > 1 ? "s" : ""}, ~${site.durationHours}h)`,
+      );
+      this.expeditionPanel.render(this.state);
+    } else {
+      this.showToast("Cannot dispatch (need crew home, rations, and no team there)");
     }
   }
 
