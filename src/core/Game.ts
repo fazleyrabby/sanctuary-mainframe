@@ -13,6 +13,7 @@ import { View } from "../view/View";
 import { PixiIsometricView } from "../view/pixi/PixiIsometricView";
 import { InputManager } from "../input/InputManager";
 import { BuildMenu } from "../ui/BuildMenu";
+import { FallenColonyModal } from "../ui/FallenColonyModal";
 import { HUD } from "../ui/HUD";
 import { InspectorPanel, type InspectorContent, type InspectorRow } from "../ui/InspectorPanel";
 import { MainframePanel } from "../ui/MainframePanel";
@@ -38,6 +39,7 @@ export class Game {
   private buildMenu: BuildMenu;
   private inspector: InspectorPanel;
   private mainframe: MainframePanel;
+  private fallenModal: FallenColonyModal;
   private loop: Loop;
   private events = new EventBus();
 
@@ -69,11 +71,14 @@ export class Game {
     this.buildMenu = new BuildMenu(uiRoot);
     this.inspector = new InspectorPanel(uiRoot, (id, payload) => this.onInspectorAction(id, payload));
     this.mainframe = new MainframePanel(uiRoot, (id) => this.onMainframeAction(id));
+    this.fallenModal = new FallenColonyModal(uiRoot, () => void this.newGame());
 
     this.hud.onTool((tool) => {
       if (tool === "Build") {
         const visible = this.buildMenu.toggle();
         if (!visible) this.cancelBuild();
+      } else if (tool === "Farm") {
+        this.focusNearestFarm();
       } else if (tool === "AI") {
         this.mainframe.toggle(this.mainframeReport(), this.state.aiTrust);
       }
@@ -148,6 +153,12 @@ export class Game {
     this.updateInspector();
     this.mainframe.refresh(this.mainframeReport(), this.state.aiTrust);
 
+    if (this.state.fallen) {
+      this.fallenModal.show(this.time.day);
+    } else {
+      this.fallenModal.hide();
+    }
+
     if (this.toast && performance.now() > this.toast.until) {
       this.toast = null;
       this.hud.clearToast();
@@ -161,6 +172,8 @@ export class Game {
       if (key === "b") {
         const visible = this.buildMenu.toggle();
         if (!visible) this.cancelBuild();
+      } else if (key === "f") {
+        this.focusNearestFarm();
       } else if (key === "r") {
         this.rotation = (this.rotation + 1) % 4;
       } else if (key === "escape") {
@@ -299,6 +312,32 @@ export class Game {
     } else {
       this.pixiView?.setSelected(gx, gy);
     }
+  }
+
+  private focusNearestFarm(): void {
+    const farms = this.state.buildings.filter((b) => b.id === "farm");
+    if (farms.length === 0) {
+      this.showToast("Build a Farm first");
+      return;
+    }
+
+    // Find nearest farm to current camera center or selected tile
+    let targetFarm = farms[0];
+    if (this.state.selected) {
+      const sx = this.state.selected.gx;
+      const sy = this.state.selected.gy;
+      let bestDist = Infinity;
+      for (const f of farms) {
+        const d = Math.hypot(f.gx - sx, f.gy - sy);
+        if (d < bestDist) {
+          bestDist = d;
+          targetFarm = f;
+        }
+      }
+    }
+
+    this.selectTile(targetFarm.gx, targetFarm.gy);
+    this.pixiView?.centerOn(targetFarm.gx, targetFarm.gy);
   }
 
   // ------------------------------------------------------------- mainframe

@@ -845,6 +845,15 @@ export class PixiIsometricView {
     this.updateCamera();
   }
 
+  /** Center camera on a specific grid tile. */
+  centerOn(gx: number, gy: number): void {
+    const cx = (gx + 0.5) * TILE_SIZE;
+    const cy = (gy + 0.5) * TILE_SIZE;
+    this.cameraX = window.innerWidth / 2 - cx * this.zoom;
+    this.cameraY = window.innerHeight / 2 - cy * this.zoom;
+    this.updateCamera();
+  }
+
   screenToGrid(screenX: number, screenY: number): [number, number] {
     const localX = (screenX - this.cameraX) / this.zoom;
     const localY = (screenY - this.cameraY) / this.zoom;

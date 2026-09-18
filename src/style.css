@@ -938,3 +938,95 @@ body {
   border-color: rgba(167, 139, 250, 0.6);
 }
 
+/* Fallen Colony Fullscreen Modal */
+.fallen-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 8, 8, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1000;
+  pointer-events: auto;
+  animation: fallen-fade-in 400ms ease;
+}
+
+@keyframes fallen-fade-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.fallen-dialog {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 36px 44px;
+  background: rgba(24, 15, 15, 0.95);
+  border: 1px solid rgba(217, 102, 74, 0.45);
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75), 0 0 32px rgba(217, 102, 74, 0.15);
+  max-width: 440px;
+  width: 90%;
+}
+
+.fallen-icon {
+  font-size: 48px;
+  line-height: 1;
+  color: var(--danger);
+  margin-bottom: 16px;
+  filter: drop-shadow(0 0 12px rgba(217, 102, 74, 0.5));
+}
+
+.fallen-title {
+  margin: 0 0 8px 0;
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #ffb4a2;
+}
+
+.fallen-subtitle {
+  margin: 0 0 20px 0;
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.fallen-days {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  background: rgba(127, 214, 194, 0.1);
+  border: 1px solid rgba(127, 214, 194, 0.25);
+  border-radius: 4px;
+  padding: 6px 18px;
+  margin-bottom: 28px;
+}
+
+.fallen-btn {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  padding: 12px 28px;
+  border: 1px solid rgba(217, 102, 74, 0.6);
+  border-radius: 4px;
+  background: rgba(217, 102, 74, 0.18);
+  color: #ffcfc4;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.fallen-btn:hover {
+  background: rgba(217, 102, 74, 0.35);
+  border-color: rgba(217, 102, 74, 0.9);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(217, 102, 74, 0.4);
+}
+
