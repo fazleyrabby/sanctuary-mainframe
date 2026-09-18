@@ -9,7 +9,7 @@ import {
   snoozeDuration,
   type MainframeReport,
 } from "../systems/MainframeAdvisor";
-import { View } from "../view/View";
+import { AssetManager } from "../view/AssetManager";
 import { PixiIsometricView } from "../view/pixi/PixiIsometricView";
 import { InputManager } from "../input/InputManager";
 import { BuildMenu } from "../ui/BuildMenu";
@@ -25,8 +25,7 @@ import { GameTime } from "./Time";
 
 export class Game {
   private world: World;
-  private view: View;
-  private canvas: HTMLCanvasElement;
+  private assets = new AssetManager();
   private pixiCanvas: HTMLCanvasElement;
   private pixiView: PixiIsometricView | null = null;
 
@@ -50,11 +49,9 @@ export class Game {
   private toast: { text: string; until: number } | null = null;
 
   constructor(
-    canvas: HTMLCanvasElement,
     pixiCanvas: HTMLCanvasElement,
     uiRoot: HTMLElement,
   ) {
-    this.canvas = canvas;
     this.pixiCanvas = pixiCanvas;
     this.world = new World(
       GameConfig.world.gridWidth,
@@ -63,8 +60,6 @@ export class Game {
       GameConfig.world.seed,
     );
     this.state = new GameState(this.world);
-
-    this.view = new View(canvas);
 
     this.input = new InputManager(pixiCanvas);
     this.hud = new HUD(uiRoot);
@@ -95,25 +90,42 @@ export class Game {
       (delta) => this.render(delta),
       10,
     );
-
-    window.addEventListener("resize", this.onResize);
-    this.onResize();
   }
 
-  /** 2.5D is the only renderer. Three.js View stays headless (asset baking). */
+  /** 2.5D Pixi renderer with baked GLB sprites. */
   private async bootPixi(): Promise<void> {
-    this.canvas.style.display = "none";
     this.pixiCanvas.style.display = "block";
     if (!this.pixiView) {
       this.pixiView = new PixiIsometricView();
       await this.pixiView.init(this.pixiCanvas);
-      this.pixiView.bakeAssets(this.view.assets);
+      this.pixiView.bakeAssets(this.assets);
     }
     this.pixiView.buildWorld(this.world, this.state);
   }
 
   async init(): Promise<void> {
-    await this.view.loadAssets();
+    const buildings = [
+      "shelter",
+      "farm",
+      "storage",
+      "water_collector",
+      "workshop",
+      "generator",
+      "server_room",
+      "ai_core",
+      "campfire",
+    ];
+    const props = [
+      "dead_tree",
+      "pine_tree",
+      "rock",
+      "boulder",
+      "bush",
+      "crate",
+      "barrel",
+      "scrap_pile",
+    ];
+    await this.assets.load({ buildings, props });
     this.state.populateNodes();
     this.placeStarterSettlement();
     this.hud.setActiveTool("Build");
@@ -129,7 +141,6 @@ export class Game {
   stop(): void {
     this.loop.stop();
     this.input.dispose();
-    window.removeEventListener("resize", this.onResize);
   }
 
   private tick(fixedDelta: number): void {
@@ -640,8 +651,4 @@ export class Game {
     this.pixiView?.syncFromState(this.world, this.state);
     return placedIds;
   }
-
-  private onResize = (): void => {
-    this.view.resize(window.innerWidth, window.innerHeight);
-  };
 }

@@ -32,7 +32,6 @@ body {
   inset: 0;
 }
 
-#game-canvas,
 #pixi-canvas {
   position: absolute;
   inset: 0;
